@@ -56,8 +56,8 @@ def start_cameras():
     left_camera = CSI_Camera()
     left_camera.create_gstreamer_pipeline(
             sensor_id=0,
-            sensor_mode=5,
-            framerate=120,
+            sensor_mode=4,
+            framerate=60,
             flip_method=0,
             display_height=720,
             display_width=960,

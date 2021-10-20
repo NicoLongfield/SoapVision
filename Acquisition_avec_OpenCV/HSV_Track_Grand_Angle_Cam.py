@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+import sys
 from csi_camera import CSI_Camera
 from tracker import *
 from OPC_UA import *
@@ -14,6 +15,7 @@ tracker = EuclideanDistTracker()
 
 OPCUA = OPCUACommunication()
 
+OPCUA_Pause = sys.argv[1]
 
 
 def nothing(x):
@@ -88,7 +90,7 @@ def start_cameras():
         left_camera.start_counting_fps()
         while cv2.getWindowProperty("CSI Cameras", 0) >= 0 :
             #left_image = read_camera(left_camera, False)
-            img=cv2.VideoCapture(0)
+            img=read_camera(right_camera,show_fps)
             hsv=cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
 
             hueLow=cv2.getTrackbarPos('hueLower', 'Trackbars')
@@ -123,7 +125,8 @@ def start_cameras():
                 cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 if 420 <= x and x+w <=650 and 275 <= y and y+h<= 425:
-                    loop = asyncio.run(OPCUA.pause_convoyeur_coupe())
+                    if OPCUA_Pause:
+                        loop = asyncio.run(OPCUA.pause_convoyeur_coupe())
                     # coroutine = OPCUA.pause_convoyeur_coupe()
                     # loop.run_until_complete(coroutine)
                     time.sleep(0.1)
