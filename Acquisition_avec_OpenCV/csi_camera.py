@@ -83,9 +83,9 @@ class CSI_Camera:
 
     def read(self):
         with self.read_lock:
-            # frame = self.frame.copy()
+            frame = self.frame.copy()
             grabbed=self.grabbed
-        return grabbed#, frame
+        return grabbed, frame
 
     def release(self):
         if self.video_capture != None:
