@@ -8,15 +8,12 @@ from OPC_UA import *
 import time
 import asyncio
 
-path = '/home/jetson_user/Projet/Code/Nano/Camera/Dernier_Code/Acquisition_avec_OpenCV/Images_15oct2021'
+path = '/home/jetson_user/Projet/Data/25_Oct_2021'
 
 show_fps = True
 tracker = EuclideanDistTracker()
-
 OPCUA = OPCUACommunication()
-
 OPCUA_Pause = sys.argv[1]
-
 
 def nothing(x):
     pass
@@ -116,7 +113,6 @@ def start_cameras():
                 if area > 5000 :
                     cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
                     x, y, w, h = cv2.boundingRect(cnt)
-                    # cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     detections.append([x, y, w, h])
 
             boxes_ids = tracker.update(detections)
@@ -124,7 +120,7 @@ def start_cameras():
                 x, y, w, h, id = box_id
                 cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                if 420 <= x and x+w <=650 and 275 <= y and y+h<= 425:
+                if 460 <= x and x+w <=680 and 300 <= y and y+h<= 440:
                     if OPCUA_Pause:
                         loop = asyncio.run(OPCUA.pause_convoyeur_coupe())
                     # coroutine = OPCUA.pause_convoyeur_coupe()
@@ -132,7 +128,7 @@ def start_cameras():
                     time.sleep(0.1)
                     left_image = read_camera(left_camera, False)
                     cv2.imwrite(os.path.join(path , 'test%d_x%d_y%d.jpg') % (id,x,y), left_image)  
-            cv2.rectangle(img, (420, 275), (650, 425), (0, 0, 255), 1)
+            cv2.rectangle(img, (460, 300), (680, 440), (0, 0, 255), 1)
             cv2.imshow("CSI Cameras", img)
             cv2.imshow("HSV-Mask and Track",FGmask) #  FGmaskComp
             cv2.imshow("Object Track", FG_Obj)
