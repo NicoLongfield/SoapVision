@@ -19,7 +19,7 @@ class OPCUACommunication():
         async with Client(url=self.url_OPCUA_boudineuse) as client:
             dv = ua.DataValue(ua.Variant(True, ua.VariantType.Boolean))
             _logger.info("Attempting to pause the conveyor belt")
-            node_pause_convoyeur = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]) #,"4:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]
+            node_pause_convoyeur = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:entree_OPCUA_pauseConvoyeur"]) #,"4:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]
             await node_pause_convoyeur.set_value(dv)
             _logger.info("The conveyor belt was paused")
 

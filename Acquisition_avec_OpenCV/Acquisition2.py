@@ -136,12 +136,13 @@ def start_cameras():
                 x, y, w, h, id = box_id
                 cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                if 460 <= x and x+w <=680 and 300 <= y and y+h<= 440 and id != last:
-                    #if OPCUA_Pause:
-                    #    loop = asyncio.run(OPCUA.pause_convoyeur_coupe())
+                if 440 <= x and x+w <=680 and id != last:
+                    if OPCUA_Pause:
+                        asyncio.run(OPCUA.pause_convoyeur_coupe())
+                        print("PAUSE!!!")
                     # coroutine = OPCUA.pause_convoyeur_coupe()
                     # loop.run_until_complete(coroutine)
-                    #time.sleep(0.1)
+                    time.sleep(0.39)
                     last = id
                     
                     cv2.imwrite(os.path.join(path , 'Ocean_%d_'+ str(time_string()) +'.jpg') % (id), read_camera(left_camera, False))  
