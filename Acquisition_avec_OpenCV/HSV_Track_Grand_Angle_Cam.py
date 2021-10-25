@@ -3,9 +3,10 @@ import numpy as np
 import os
 import sys
 from csi_camera import CSI_Camera
+from function_cam import *
 from tracker import *
 from OPC_UA import *
-import time
+from Time_func import *
 import asyncio
 
 path = '/home/jetson_user/Projet/Data/25_Oct_2021'
@@ -32,13 +33,16 @@ def read_camera(csi_camera,display_fps):
         draw_label(camera_image, "Frames Read (PS): "+str(csi_camera.last_frames_read),(10,40))
     return camera_image
 
+right_camera = CSI_Camera()
+left_camera = CSI_Camera()
+print(OPCUA_Pause)
+
 DISPLAY_WIDTH=960
 DISPLAY_HEIGHT=720
-
 SENSOR_MODE_720=3
 
 def start_cameras():
-    
+
     cv2.namedWindow('Trackbars')
     cv2.createTrackbar('hueLower', 'Trackbars',91,179,nothing)
     cv2.createTrackbar('hueUpper', 'Trackbars',106,179,nothing)
@@ -46,7 +50,10 @@ def start_cameras():
     cv2.createTrackbar('satHigh', 'Trackbars',255,255,nothing)
     cv2.createTrackbar('valLow','Trackbars',126,255,nothing)
     cv2.createTrackbar('valHigh','Trackbars',255,255,nothing)
-
+    
+    cv2.namedWindow("CSI Cameras", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("HSV-Mask and Track", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Object Track", cv2.WINDOW_NORMAL)
     left_camera = CSI_Camera()
     left_camera.create_gstreamer_pipeline(
             sensor_id=0,
@@ -70,12 +77,8 @@ def start_cameras():
     )
     right_camera.open(right_camera.gstreamer_pipeline)
     right_camera.start()
-
-    cv2.namedWindow("CSI Cameras", cv2.WINDOW_NORMAL)
-    cv2.namedWindow("HSV-Mask and Track", cv2.WINDOW_NORMAL)
-    cv2.namedWindow("Object Track", cv2.WINDOW_NORMAL)
     if (
-        #not right_camera.video_capture.isOpened()
+        not right_camera.video_capture.isOpened()
     ):
         # Cameras did not open, or no camera attached
 
@@ -87,7 +90,7 @@ def start_cameras():
         left_camera.start_counting_fps()
         while cv2.getWindowProperty("CSI Cameras", 0) >= 0 :
             #left_image = read_camera(left_camera, False)
-            img=read_camera(right_camera,show_fps)
+            img=cv2.VideoCapture(0)
             hsv=cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
 
             hueLow=cv2.getTrackbarPos('hueLower', 'Trackbars')
