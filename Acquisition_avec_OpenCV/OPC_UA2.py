@@ -30,7 +30,7 @@ class OPCUACommunication():
             state_arret = await node_pause_convoyeur.read_value()
             print("Arret = " + str(state_arret))
 
-# loop = asyncio.get_event_loop()
+
 if __name__ == "__main__":
     OPCUA =  OPCUACommunication()
     asyncio.run(OPCUA.read_acquisition_arret())

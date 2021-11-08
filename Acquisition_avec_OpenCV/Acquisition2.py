@@ -9,7 +9,7 @@ from OPC_UA import *
 from Time_func import *
 import asyncio
 
-path = '/home/jetson_user/Projet/Images/25_Oct_2021'
+path = '/home/jetson_user/Projet/Images/5_Nov_2021/Test_et_Bad'
 
 show_fps = True
 
