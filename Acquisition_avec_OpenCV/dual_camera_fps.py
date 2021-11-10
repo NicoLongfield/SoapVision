@@ -29,9 +29,6 @@ def draw_label(cv_image, label_text, label_position):
 # Return an image
 def read_camera(csi_camera,display_fps):
     _ , camera_image=csi_camera.read()
-
-
-
     if display_fps:
         draw_label(camera_image, "Frames Displayed (PS): "+str(csi_camera.last_frames_displayed),(10,20))
         draw_label(camera_image, "Frames Read (PS): "+str(csi_camera.last_frames_read),(10,40))
