@@ -23,11 +23,17 @@ class OPCUACommunication():
             await node_pause_convoyeur.set_value(dv)
             _logger.info("The conveyor belt was paused")
 
+    async def read_acquisition_arret(self):
+        async with Client(url=self.url_OPCUA_boudineuse) as client:
+            _logger.info("Attempting to read the conveyor's state")
+            node_pause_convoyeur = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:acquisition_arret"])
+            state_arret = await node_pause_convoyeur.read_value()
+            print("Arret = " + str(state_arret))
 
-# loop = asyncio.get_event_loop()
+
 if __name__ == "__main__":
     OPCUA =  OPCUACommunication()
-    asyncio.run(OPCUA.pause_convoyeur_coupe())
+    asyncio.run(OPCUA.read_acquisition_arret())
     
 
 

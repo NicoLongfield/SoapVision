@@ -98,6 +98,13 @@ class CSI_Camera:
         if self.read_thread != None:
             self.read_thread.join()
 
+    def release_left(self):
+        if self.video_capture != None:
+            self.video_capture.release()
+            self.video_capture = None
+        if self.read_thread != None:
+            self.read_thread.join()
+
     def update_fps_stats(self):
         self.last_frames_read=self.frames_read
         self.last_frames_displayed=self.frames_displayed
