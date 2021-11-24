@@ -2,11 +2,13 @@ import cv2
 import numpy as np
 import os
 import sys
+import json
 from csi_camera import CSI_Camera
 from function_cam import *
 from tracker import *
 from OPC_UA import *
 from Time_func import *
+from arduino_func import *
 import asyncio
 
 path = '/home/jetson_user/Projet/Images/22_Nov_2021'
@@ -97,11 +99,28 @@ def start_cameras():
         cv2.createTrackbar('valLow','Trackbars',126,255,nothing)
         cv2.createTrackbar('valHigh','Trackbars',255,255,nothing)
 
-        cv2.namedWindow("HSV-Mask and Track", cv2.WINDOW_AUTOSIZE)
+        #cv2.namedWindow("HSV-Mask and Track", cv2.WINDOW_AUTOSIZE)
         #cv2.namedWindow("Object Track", cv2.WINDOW_NORMAL)
         right_camera.start_counting_fps()
         #left_camera.start_counting_fps()
+        arduino = serial.Serial(
+            port = '/dev/ttyACM0',
+            baudrate = 115200,
+            bytesize = serial.EIGHTBITS,
+            parity = serial.PARITY_NONE,
+            stopbits = serial.STOPBITS_ONE,
+            timeout = 5,
+            xonxoff = False,
+            rtscts = False,
+            dsrdtr = False,
+            writeTimeout = 2
+        )
         while cv2.getWindowProperty("CSI Cameras", 0) >= 0 :
+            data = arduino.readline().decode("utf-8")
+            
+            dict_json = json.loads(data)
+            
+            
             img=read_camera(right_camera,show_fps)
             hsv=cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
 
@@ -122,6 +141,7 @@ def start_cameras():
             right_camera.frames_displayed += 1 
             contours, _ = cv2.findContours(FGmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             detections = []
+            print(dict_json.get("dht_temp"))
             for cnt in contours:
                 # Calculate area and remove small elements
                 area = cv2.contourArea(cnt)
