@@ -9,7 +9,7 @@ from function_cam import *
 from tracker import *
 from OPC_UA import *
 from Time_func import *
-from arduino_func import *
+#from arduino_func import *
 from pathlib import Path
 import asyncio
 import concurrent.futures
@@ -34,9 +34,9 @@ path = '/home/jetson_user/Projet/Images/' + time.strftime('%d_%b_%Y')
 Path(path).mkdir(parents=True, exist_ok=True)
 
 
-def write_zoom_img(path_, img_name_, delay):
-    time.sleep(delay)
-    img_being_written = read_camera(left_camera, False)
+async def write_zoom_img(path_, img_name_, delay, csi_camera):
+    await asyncio.sleep(delay)
+    _, img_being_written = csi_camera.read()
     cv2.imwrite(os.path.join(path_, img_name_), img_being_written)
 
 
@@ -112,19 +112,19 @@ def start_cameras():
         last = -1
         cv2.namedWindow("CSI Cameras", cv2.WINDOW_AUTOSIZE)
         cv2.namedWindow("Trackbars", cv2.WINDOW_AUTOSIZE)
-        cv2.createTrackbar('hueLower', 'Trackbars', 91, 179, nothing)
-        cv2.createTrackbar('hueUpper', 'Trackbars', 106, 179, nothing)
-        cv2.createTrackbar('satLow', 'Trackbars', 91, 255, nothing)
+        cv2.createTrackbar('hueLower', 'Trackbars', 0, 179, nothing)
+        cv2.createTrackbar('hueUpper', 'Trackbars', 30, 179, nothing)
+        cv2.createTrackbar('satLow', 'Trackbars', 50, 255, nothing)
         cv2.createTrackbar('satHigh', 'Trackbars', 255, 255, nothing)
         cv2.createTrackbar('valLow', 'Trackbars', 126, 255, nothing)
         cv2.createTrackbar('valHigh', 'Trackbars', 255, 255, nothing)
-
+        cv2.createTrackbar('val_delay', 'Trackbars', 50, 50, nothing)
         # cv2.namedWindow("HSV-Mask and Track", cv2.WINDOW_AUTOSIZE)
         # cv2.namedWindow("Object Track", cv2.WINDOW_NORMAL)
         right_camera.start_counting_fps()
         # left_camera.start_counting_fps()
-        ard_p = multiprocessing.Process(target=update_serial)
-        ard_p.start()
+        #ard_p = multiprocessing.Process(target=update_serial)
+        #ard_p.start()
         while cv2.getWindowProperty("CSI Cameras", 0) >= 0:
 
             img = read_camera(right_camera, show_fps)
@@ -138,7 +138,8 @@ def start_cameras():
 
             Lv = cv2.getTrackbarPos('valLow', 'Trackbars')
             Uv = cv2.getTrackbarPos('valHigh', 'Trackbars')
-
+            delayv = cv2.getTrackbarPos('val_delay', 'Trackbars')/100
+            print(delayv)
             l_b = np.array([hueLow, Ls, Lv])
             u_b = np.array([hueUp, Us, Uv])
 
@@ -147,7 +148,7 @@ def start_cameras():
             right_camera.frames_displayed += 1
             contours, _ = cv2.findContours(FGmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             detections = []
-            print(dict_json.get("dht_temp"))
+            #print(dict_json.get("dht_temp"))
             for cnt in contours:
                 # Calculate area and remove small elements
                 area = cv2.contourArea(cnt)
@@ -171,7 +172,7 @@ def start_cameras():
                     # time.sleep(0.39)
                     last = id
                     img_name = 'Ocean_' + str(id) + '_' + str(time_string()) + '.jpg'  #####
-                    concurrent.futures.ThreadPoolExecutor.submit(write_zoom_img, (path, img_name, 0.39))  #####
+                    asyncio.run(write_zoom_img(path, img_name, delayv, left_camera)) #####concurrent.futures.ThreadPoolExecutor.submit
 
                     # cv2.imwrite(os.path.join(path , 'Ocean_%d_'+ str(time_string()) +'.jpg') % (id), read_camera(left_camera, False))
             cv2.rectangle(img, (460, 300), (680, 440), (0, 0, 255), 1)
