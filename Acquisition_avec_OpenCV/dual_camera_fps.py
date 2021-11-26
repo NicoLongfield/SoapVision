@@ -64,7 +64,18 @@ def start_cameras():
     )
     left_camera.open(left_camera.gstreamer_pipeline)
     left_camera.start()
-
+    left_camera1 = CSI_Camera()
+    left_camera1.create_gstreamer_pipeline(
+            sensor_id=2,
+            sensor_mode=SENSOR_MODE_720,
+            framerate=30,
+            flip_method=0,
+            display_height=DISPLAY_HEIGHT,
+            display_width=DISPLAY_WIDTH,
+    )
+    left_camera1.open(left_camera1.gstreamer_pipeline)
+    left_camera.start()
+    
     right_camera = CSI_Camera()
     right_camera.create_gstreamer_pipeline(
             sensor_id=1,
@@ -78,7 +89,7 @@ def start_cameras():
     right_camera.start()
 
     cv2.namedWindow("CSI Cameras", cv2.WINDOW_AUTOSIZE)
-
+    cv2.namedWindow("CSI Cameras1", cv2.WINDOW_AUTOSIZE)
     if (
         not left_camera.video_capture.isOpened()
         or not right_camera.video_capture.isOpened()
@@ -103,11 +114,13 @@ def start_cameras():
             w =cv2.getTrackbarPos('W', 'Trackbars')
             h =cv2.getTrackbarPos('H', 'Trackbars')
             left_image=read_camera(left_camera,show_fps)
+            left_image1=read_camera(left_camera1,False)
             right_image=read_camera(right_camera,show_fps)
             cv2.rectangle(right_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
             # We place both images side by side to show in the window
             camera_images = np.hstack((left_image, right_image))
-            cv2.imshow("CSI Cameras", camera_images)
+            cv2.imshow("CSI Cameras", camera_image)
+            cv2.imshow("CSI Cameras1", left_image1)
             left_camera.frames_displayed += 1
             right_camera.frames_displayed += 1
             # This also acts as a frame limiter
