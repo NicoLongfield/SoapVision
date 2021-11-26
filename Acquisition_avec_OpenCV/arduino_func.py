@@ -22,20 +22,17 @@ arduino = serial.Serial(
 arduino.reset_input_buffer()
 #       self.running = False
 
-json_data = []
 
-def update_serial(dict_json):
+def update_serial():
     while True:
         data = arduino.readline().decode("utf-8")
         try:
             dict_json = json.loads(data)
-            return dict_json
+            global json_data = dict_json
         except json.JSONDecodeError as e:
             dict_json = {}
 
-def start_serial(dict_args):
-    arduino_serial = threading.Thread(target=update_serial(), args=dict_args)
-    arduino_serial.start()
+
 #
 #def stop_serial(self):
 #    self.running = False
