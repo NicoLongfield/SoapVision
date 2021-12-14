@@ -6,17 +6,52 @@ import cv2
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
 import numpy as np
 from csi_camera import CSI_Camera
-from main import *
+from tracker import *
+from OPC_UA import *
+from Time_func import *
+from pathlib import Path
+time_init()
 
-def nothing(x):
-    pass
 
-SENSOR_MODE_720 = 3
-DISPLAY_WIDTH = 960
-DISPLAY_HEIGHT = 720
+path = '/home/jetson_user/Projet/Images/' + time.strftime('%d_%b_%Y')
+Path(path).mkdir(parents=True, exist_ok=True)
 
-show_fps = True
+def savon_type_wide(savon):
+    if savon == 'Orange':
+        lower_bound = np.array([0, 50, 126])
+        upper_bound = np.array([30, 255, 255])
 
+    if savon == 'Bleu':
+        lower_bound = np.array([93, 88, 134])
+        upper_bound = np.array([103, 255, 255])
+
+    if savon == 'Vert':
+        lower_bound = np.array([46, 38, 160])
+        upper_bound = np.array([70, 255, 255])
+
+    return upper_bound, lower_bound
+
+def savon_type_zoom(savon):
+    if savon == 'Orange':
+        lower_bound = np.array([0, 15, 65])
+        upper_bound = np.array([45, 255, 220])
+        lower_bound2 = np.array([140, 13, 65])
+        upper_bound2 = np.array([179, 255, 220])
+
+    if savon == 'Vert':
+        lower_bound = np.array([0, 0, 125])
+        upper_bound = np.array([63, 84, 255])
+        lower_bound2 = np.array([157, 0, 125])
+        upper_bound2 = np.array([179, 84, 255])
+    
+    if savon == 'Bleu':
+        lower_bound = np.array([80, 10, 120])
+        upper_bound = np.array([122, 179, 175])        
+        lower_bound2 = np.array([179, 10, 120])
+        upper_bound2 = np.array([179, 179, 175])
+
+
+    return upper_bound, lower_bound, upper_bound2, lower_bound2
 
 
 # Simple draw label on an image; in our case, the video frame
@@ -35,25 +70,42 @@ def read_camera(csi_camera, display_fps):
         draw_label(camera_image, "Frames Read (PS): " + str(csi_camera.last_frames_read), (10, 40))
     return camera_image
 
+show_fps = True
+
+tracker = EuclideanDistTracker()
+OPCUA = OPCUACommunication()
+OPCUA_Pause = sys.argv[1]
+
+SENSOR_MODE_720 = 3
+DISPLAY_WIDTH = 960
+DISPLAY_HEIGHT = 720
 
 class VideoThread(QThread):
+    # change_pixmap_signal = pyqtSignal(np.ndarray)
+    
     change_pixmap_signal_wide_view = pyqtSignal(np.ndarray)
-    #left_camera = CSI_Camera()
+    change_pixmap_signal_zoom_view = pyqtSignal(np.ndarray)
+    left_camera = CSI_Camera()
     right_camera = CSI_Camera()
     def __init__(self):
         super().__init__()
+        self._run_flag = False
+        self.stopped = True
+        self.type_savon = 'Orange'
 
     def run(self):
-        #self.left_camera.create_gstreamer_pipeline(
-        #sensor_id=0,
-        #sensor_mode=SENSOR_MODE_720,
-        #framerate=30,
-        #flip_method=0,
-        #display_height=DISPLAY_HEIGHT,
-        #display_width=DISPLAY_WIDTH,
-        #)
-        #self.left_camera.open(self.left_camera.gstreamer_pipeline)
-        #self.left_camera.start()
+        self._run_flag = True
+        self.stopped = False
+        self.left_camera.create_gstreamer_pipeline(
+        sensor_id=0,
+        sensor_mode=SENSOR_MODE_720,
+        framerate=30,
+        flip_method=0,
+        display_height=DISPLAY_HEIGHT,
+        display_width=DISPLAY_WIDTH,
+        )
+        self.left_camera.open(self.left_camera.gstreamer_pipeline)
+        self.left_camera.start()
         self.right_camera.create_gstreamer_pipeline(
         sensor_id=1,
         sensor_mode=SENSOR_MODE_720,
@@ -65,84 +117,172 @@ class VideoThread(QThread):
         self.right_camera.open(self.right_camera.gstreamer_pipeline)
         self.right_camera.start()
         if (
-                    not self.right_camera.video_capture.isOpened()# or not self.right_camera.video_capture.isOpened()
+                    not self.right_camera.video_capture.isOpened() or not self.left_camera.video_capture.isOpened()
             ):
             print("Unable to open any cameras")
             SystemExit(0)
+        
+        delayv = 0.5
+        last = -1
+        new = False
+        
         try:
             #self.left_camera.start_counting_fps()
             self.right_camera.start_counting_fps()
-            while self.right_camera.running:
-                self.image = read_camera(self.right_camera, False)
-                #left_img = read_camera(self.left_camera, show_fps)
-                #self.left_camera.frames_displayed+=1
+            while self._run_flag:
+                
+                img = read_camera(self.right_camera, show_fps)
+                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                up_bound, low_bound = savon_type_wide(self.type_savon)
+                u_b, l_b, u_b2, l_b2 = savon_type_zoom(self.type_savon)
+
+                FGmask = cv2.inRange(hsv, low_bound, up_bound)
+                
+                contours, _ = cv2.findContours(FGmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                detections = []
+                for cnt in contours:
+                    area = cv2.contourArea(cnt)
+                    if area > 5000:
+                        cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        if y >= 275 and y + h <= 465:
+                            detections.append([x, y, w, h])
+
+                boxes_ids = tracker.update(detections)
+                
+                for box_id in boxes_ids:
+                    x, y, w, h, id = box_id
+                    cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
+                    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    if 440 <= x and x + w <= 680 and id != last:
+                        if OPCUA_Pause:
+                            asyncio.run(OPCUA.pause_convoyeur_coupe())
+                            print("PAUSE!!!")
+
+                        last = id
+                        img_name = 'Ocean_' + str(id) + '_' + str(time_string()) + '.jpg'  #####
+                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, u_b, l_b, u_b2, l_b2)) #####concurrent.futures.ThreadPoolExecutor.submit
+                cv2.rectangle(img, (460, 300), (680, 440), (0, 0, 255), 2)
+                cv_img = img
+
                 self.right_camera.frames_displayed+=1
-                if True:
-                    self.image = convert_cv_qt(cv_img)#self.change_pixmap_signal_wide_view.emit(cv_img)
-                    #self.change_pixmap_signal_zoom_view.emit(left_img)
-                    self.msleep(30)
+                self.change_pixmap_signal_wide_view.emit(cv_img)
+                self.msleep(30)
         finally:
             
             self.right_camera.stop()
             self.right_camera.release()
-            #self.left_camera.stop()
-            #self.left_camera.release()
+            self.left_camera.stop()
+            self.left_camera.release_left()
+            self.stopped = True
 
+    async def write_zoom_img(self, path_, img_name_, delay, csi_camera, u_b, l_b, u_b2, l_b2):
+        await asyncio.sleep(delay)
+        _, img_being_written = csi_camera.read()
+        
+        hsv = cv2.cvtColor(img_being_written, cv2.COLOR_BGR2HSV)
+        FGmask1_zoom = cv2.inRange(hsv, l_b, u_b)
+        FGmask2_zoom = cv2.inRange(hsv, l_b2, u_b2)
+        # FGmask_blanc = cv2.inRange(img_being_written,np.array([220,220,220]), np.array([255,255,255]))
+        FGmask_zoom = cv2.add(FGmask1_zoom, FGmask2_zoom)#, FGmask_blanc)
+        FG_Obj_zoom = cv2.bitwise_and(img_being_written, img_being_written, mask=FGmask_zoom)
+        contours, _ = cv2.findContours(FGmask_zoom, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        c = max(contours, key=cv2.contourArea)
+        box = cv2.boxPoints(cv2.minAreaRect(c))
+        x, y, w, h = cv2.boundingRect(box)
+
+        x = np.int32((x+math.floor(w/2))-175)
+        y = np.int32((y+math.floor(h/2))-150)
+        w = np.int32(350)
+        h = np.int32(300)
+        
+        mask = np.full((img_being_written.shape[0], img_being_written.shape[1]), 0, dtype=np.uint8)
+        cv2.drawContours(mask, [c], 0, (255,255,255), -1)
+        cv2.drawContours(mask, [c], 0, (255,255,255), 3)
+        out = cv2.bitwise_and(img_being_written, img_being_written, mask=mask)
+        roi = out[y:y+h,x:x+w]
+        # self.change_pixmap_signal_zoom_view.emit(img_being_written)
+        if roi.size != 0:
+            self.change_pixmap_signal_zoom_view.emit(roi)
+            cv2.imwrite(os.path.join(path_, img_name_), out)
+        # return img_being_written
 
     def stop(self):
         """Sets run flag to False and waits for thread to finish"""
-        #self.left_camera.running = False
-        self.right_camera.running = False
-        self.wait()
+        self._run_flag = False
+        # self.join()
 
-    def get_img(self):
-        return img
 
-    # def __init__(self):
-    #     super().__init__()
-    #     self.display_width = 960
-    #     self.display_height = 720
-    #     # create the label that holds the image
-    #     self.image_label = QLabel(self)
-    #     self.image_label.resize(self.display_width, self.display_height)
-    #     # create a text label
-    #     self.textLabel = QLabel('Webcam')
-    #
-    #     # create a vertical box layout and add the two labels
-    #     vbox = QVBoxLayout()
-    #     vbox.addWidget(self.image_label)
-    #     vbox.addWidget(self.textLabel)
-    #     # set the vbox layout as the widgets layout
-    #     self.setLayout(vbox)
-    #
-    #     # create the video capture thread
-    #     self.thread = VideoThread()
-    #     # connect its signal to the update_image slot
-    #     self.thread.change_pixmap_signal.connect(self.update_image)
-    #     # start the thread
-    #     self.thread.start()
+class VideoThread_Zoom(QThread):
+    change_pixmap_signal_test_zoom_view = pyqtSignal(np.ndarray)
+    left_camera = CSI_Camera()
+    def __init__(self):
+        super().__init__()
+        self._run_flag = False
+        self.stopped = True
+        self.type_savon = 'Orange'
 
-    def closeEvent(self, event):
-        self.thread.stop()
-        event.accept()
+    def run(self):
+        self._run_flag = True
+        self.stopped = False
+        self.left_camera.create_gstreamer_pipeline(
+            sensor_id=0,
+            sensor_mode=SENSOR_MODE_720,
+            framerate=30,
+            flip_method=0,
+            display_height=DISPLAY_HEIGHT,
+            display_width=DISPLAY_WIDTH,
+        )
+        self.left_camera.open(self.left_camera.gstreamer_pipeline)
+        self.left_camera.start()
 
-@pyqtSlot(np.ndarray)
-def update_image(QLabel, cv_img):
-    """Updates the image_label with a new opencv image"""
-    qt_img = convert_cv_qt(cv_img, QLabel)
-    QLabel.setPixmap(qt_img)
+        if (not self.left_camera.video_capture.isOpened()):
+            print("Unable to open any cameras")
+            SystemExit(0)
+        
+        delayv = 0.5
+        last = -1
+        new = False
+        
+        try:
+            while self._run_flag:
+                
+                img = read_camera(self.left_camera, False)
+                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                u_b, l_b, u_b2, l_b2 = savon_type_zoom(self.type_savon)
+                FGmask1_zoom = cv2.inRange(hsv, l_b, u_b)
+                FGmask2_zoom = cv2.inRange(hsv, l_b2, u_b2)
+                FGmask = cv2.add(FGmask1_zoom, FGmask2_zoom)
+                contours, _ = cv2.findContours(FGmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                detections = []
+                for cnt in contours:
+                    # Calculate area and remove small elements
+                    area = cv2.contourArea(cnt)
+                    if area > 5000:
+                        cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        if y >= 100 and y + h <= 600:
+                            detections.append([x, y, w, h])
 
-def convert_cv_qt(cv_img):
-    """Convert from an opencv image to QPixmap"""
-    rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-    h, w, ch = rgb_image.shape
-    bytes_per_line = ch * w
-    convert_to_Qt_format = QtGui.QImage(rgb_image.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
-    p = convert_to_Qt_format.scaled(960, 720, Qt.KeepAspectRatio)
-    return QPixmap.fromImage(p)
+                boxes_ids = tracker.update(detections)
+                
+                for box_id in boxes_ids:
+                    x, y, w, h, id = box_id
+                    cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
+                    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-# if __name__=="__main__":
-#     app = QApplication(sys.argv)
-#     a = App()
-#     a.show()
-#     sys.exit(app.exec_())
+                cv_img = img
+                self.change_pixmap_signal_test_zoom_view.emit(cv_img)
+                
+                self.msleep(30)
+        finally:
+            
+            self.left_camera.stop()
+            self.left_camera.release_left()
+            self.stopped = True
+
+    def stop(self):
+        """Sets run flag to False and waits for thread to finish"""
+        self._run_flag = False
+        # self.join()
+
