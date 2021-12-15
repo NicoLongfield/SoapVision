@@ -53,6 +53,9 @@ class Arduiuno_Comm(QThread):
     def __init__(self):
         super().__init__()
         self._run_flag = True
+
+    @pyqtSlot(dict)
+    def run(self):
         self.arduino = serial.Serial(
         port = '/dev/ttyACM0',
         baudrate = 115200,
@@ -66,8 +69,6 @@ class Arduiuno_Comm(QThread):
         writeTimeout = 2
         )
         self.arduino.reset_input_buffer()
-    @pyqtSlot(dict)
-    def run(self):
         while self._run_flag:
             data = self.arduino.readline().decode("utf-8")
             try:
@@ -109,20 +110,33 @@ class MyWindow(QMainWindow):
         self.font = QtGui.QFont("Arial", 16, QtGui.QFont.Bold)
 
         self.checkbox_serial = QCheckBox(self)
-        self.checkbox_serial.move(1435, 175)
+        self.checkbox_serial.move(1435, 135)
         self.checkbox_serial.resize(400, 35)
         self.checkbox_serial.setText("Communication avec Arduino")
         self.checkbox_serial.setFont(self.font)
         self.checkbox_serial.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
-
+        self.checkbox_serial.setChecked(False)
+        self.checkbox_serial.toggled.connect(self.CheckboxArduinoComm)
+        
         # create the video capture thread
 
         self.checkbox_recyclage = QCheckBox(self)
-        self.checkbox_recyclage.move(1435, 135)
+        self.checkbox_recyclage.move(1435, 175)
         self.checkbox_recyclage.resize(400, 35)
         self.checkbox_recyclage.setText("Recyclage auto.")
         self.checkbox_recyclage.setFont(self.font)
         self.checkbox_recyclage.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
+        self.checkbox_recyclage.setChecked(False)
+        self.checkbox_recyclage.toggled.connect(self.CheckboxAutoRecycle)
+
+        self.checkbox_ignore_recyclage = QCheckBox(self)
+        self.checkbox_ignore_recyclage.move(1435, 215)
+        self.checkbox_ignore_recyclage.resize(400, 35)
+        self.checkbox_ignore_recyclage.setText("Ignorer le recyclage")
+        self.checkbox_ignore_recyclage.setFont(self.font)
+        self.checkbox_ignore_recyclage.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
+        self.checkbox_ignore_recyclage.setChecked(False)
+        self.checkbox_ignore_recyclage.toggled.connect(self.CheckboxIgnoreRecycle)
         # self.thread_test = VideoThread_Zoom()
 
         self.label_color = QLabel(self)
@@ -144,13 +158,13 @@ class MyWindow(QMainWindow):
 
         self.label_data.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
         self.label_data.setFont(self.font)
-        self.label_data.setText('Données des capteurs : \n R = {} \t G = {} \t B = {} \t Lux = {} \n Temp Celsius = {} \t Hum = {} \n'.format(self.color_r, self.color_g, self.color_b, self.color_lux, self.temp, self.hum))
+        self.label_data.setText('Données des capteurs : \n R = {} \n G = {} \n B = {} \n Lux = {} \n Temp Celsius = {} \n Hum = {} \n'.format(self.color_r, self.color_g, self.color_b, self.color_lux, self.temp, self.hum))
         self.label_data.move(1435, 300)
         self.label_data.adjustSize()
         self.label_data.setAlignment(Qt.AlignLeft)
 
         self.thread2.change_json_serial_comm.connect(self.update_text)
-        self.thread2.start()
+        # self.thread2.start()
 
 
         self.label = QLabel(self)  # Create label
@@ -237,7 +251,27 @@ class MyWindow(QMainWindow):
         
         # self.qlabel.adjustSize()
     
+    def CheckboxArduinoComm(self):
+        if self.checkbox_serial.isChecked() == True:
+            self.thread2.start()
+        else:
+            self.thread2.stop()
     
+    def CheckboxAutoRecycle(self):
+        if self.checkbox_recyclage.isChecked() == True:
+            self.thread.toggle_autorecycle(True)
+        else:
+            self.thread.toggle_autorecycle(False)
+
+    def CheckboxIgnoreRecycle(self):
+        if self.checkbox_ignore_recyclage.isChecked() == True:
+            self.thread.toggle_ignore_recycle(True)
+            self.checkbox_recyclage.setChecked(False)
+            self.checkbox_recyclage.setEnabled(False)
+        else:
+            self.thread.toggle_ignore_recycle(False)
+            self.checkbox_recyclage.setEnabled(True)
+
     # Activates when Start/Stop video button is clicked to Start (ss_video
     def ClickStartVideo(self):
         # Change label color to light blue
@@ -359,7 +393,8 @@ class MyWindow(QMainWindow):
 
 
     def closeEvent(self, event):
-        self.thread2.stop()
+        if self.thread2.isRunning == True:
+            self.thread2.stop()
         if (self.thread.isRunning() == True) or (self.thread_test.isRunning() == True):
             event.ignore()
         else:

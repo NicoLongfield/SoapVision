@@ -89,6 +89,11 @@ class VideoThread(QThread):
     right_camera = CSI_Camera()
     def __init__(self):
         super().__init__()
+        self.OPCUA = OPCUA_Pause
+        self.target_to_recycle = -1
+        self.ignore_recycle = False
+        self.recycle = False
+        self.autorecycle = False
         self._run_flag = False
         self.stopped = True
         self.type_savon = 'Orange'
@@ -125,12 +130,11 @@ class VideoThread(QThread):
         delayv = 0.5
         last = -1
         new = False
-        
+        target_to_recycle = -1
         try:
             
             #self.left_camera.start_counting_fps()
             self.right_camera.start_counting_fps()
-            kick = False
             while self._run_flag:
                 img = read_camera(self.right_camera, show_fps)
                 mask_roi = np.zeros(img.shape[:2], dtype="uint8")
@@ -161,16 +165,15 @@ class VideoThread(QThread):
                     if 440 <= x and x + w <= 680 and id != last:
                         last = id
                         img_name = 'Ocean_' + str(id) + '_' + str(time_string()) + '.jpg'  #####
-                        
-                        asyncio.run(OPCUA.pause_convoyeur_coupe())
+                        if self.OPCUA:
+                            asyncio.run(OPCUA.pause_convoyeur_coupe())
                         print("PAUSE!!!")
                         asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera)) #####concurrent.futures.ThreadPoolExecutor.submit
                         
-                    
+                    if not self.ignore_recycle:
+                        if (id == self.target_to_recycle or self.autorecycle) and 600 <= x and x+w <= 750:
+                            asyncio.run(OPCUA.appel_recyclage(0.15, 0.9))
 
-                if kick:
-                    asyncio.run(OPCUA.appel_recyclage(0.15, 0.9))
-                    kick = False
                 cv2.rectangle(img, (460, 300), (680, 440), (0, 0, 255), 2)
                 cv_img = img
                 self.right_camera.frames_displayed+=1
@@ -183,6 +186,8 @@ class VideoThread(QThread):
             self.left_camera.stop()
             self.left_camera.release_left()
             self.stopped = True
+
+
 
     async def write_zoom_img(self, path_, img_name_, delay, csi_camera):
         await asyncio.sleep(delay)
@@ -219,6 +224,11 @@ class VideoThread(QThread):
             cv2.imwrite(os.path.join(path_, img_name_), out)
             
         # return img_being_written
+    def toggle_autorecycle(self, state):
+        self.autorecycle = state
+
+    def toggle_ignore_recycle(self, state):
+        self.ignore_recycle = state
 
     def stop(self):
         """Sets run flag to False and waits for thread to finish"""
