@@ -4,7 +4,7 @@ import asyncio
 from asyncua import Client, ua
 from asyncua.common import node
 from asyncua.ua.uatypes import Boolean, DataValue
-
+import time
 futures = []
 
 _logger = logging.getLogger('asyncua')
@@ -28,6 +28,7 @@ class OPCUACommunication():
             dv_true = ua.DataValue(ua.Variant(True, ua.VariantType.Boolean))
             print("Attempting to recycle")
             node_ejection = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:entree_OPCUA_ejection_bondon"]) #,"4:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]
+            # asyncio.wait()
             await node_ejection.set_value(dv_true)
             print("TERMINATOR POWER")
 
@@ -35,13 +36,13 @@ class OPCUACommunication():
         async with Client(url=self.url_OPCUA_boudineuse) as client:
             dv_true = ua.DataValue(ua.Variant(True, ua.VariantType.Boolean))
             node_conservation = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:entree_OPCUA_conservation_bondon"]) #,"4:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]
+            await asyncio.sleep(0.12)
             await node_conservation.set_value(dv_true)
-            print("I'LL BE BACK")
             
-    async def appel_recyclage(self, delay):
-        asyncio.run(self.recyclage())
-        time.sleep(delay)
-        asyncio.run(self.conservation())
+            
+    async def appel_recyclage(self, delay_entre, delay_avant):
+        await self.recyclage()
+        await self.conservation()
     
     async def read_acquisition_arret(self):
         async with Client(url=self.url_OPCUA_boudineuse) as client:
@@ -53,7 +54,7 @@ class OPCUACommunication():
 
 if __name__ == "__main__":
     OPCUA =  OPCUACommunication()
-    asyncio.run(OPCUA.pause_convoyeur_coupe())
+    asyncio.run(OPCUA.appel_recyclage(0.15, 0.5))
     
 
 

@@ -127,14 +127,19 @@ class VideoThread(QThread):
         new = False
         
         try:
+            
             #self.left_camera.start_counting_fps()
             self.right_camera.start_counting_fps()
+            kick = False
             while self._run_flag:
-                
                 img = read_camera(self.right_camera, show_fps)
-                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                mask_roi = np.zeros(img.shape[:2], dtype="uint8")
+                cv2.rectangle(mask_roi, (100,275), (750, 465), 255, -1)
+                hsv = cv2.bitwise_and(img, img, mask=mask_roi)
+                hsv = cv2.cvtColor(hsv, cv2.COLOR_BGR2HSV)
+                
                 up_bound, low_bound = savon_type_wide(self.type_savon)
-                u_b, l_b, u_b2, l_b2 = savon_type_zoom(self.type_savon)
+                
 
                 FGmask = cv2.inRange(hsv, low_bound, up_bound)
                 
@@ -145,8 +150,7 @@ class VideoThread(QThread):
                     if area > 5000:
                         cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
                         x, y, w, h = cv2.boundingRect(cnt)
-                        if y >= 275 and y + h <= 465:
-                            detections.append([x, y, w, h])
+                        detections.append([x, y, w, h])
 
                 boxes_ids = tracker.update(detections)
                 
@@ -155,19 +159,23 @@ class VideoThread(QThread):
                     cv2.putText(img, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
                     if 440 <= x and x + w <= 680 and id != last:
-                        if OPCUA_Pause:
-                            asyncio.run(OPCUA.pause_convoyeur_coupe())
-                            print("PAUSE!!!")
-
                         last = id
                         img_name = 'Ocean_' + str(id) + '_' + str(time_string()) + '.jpg'  #####
-                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, u_b, l_b, u_b2, l_b2)) #####concurrent.futures.ThreadPoolExecutor.submit
+                        
+                        asyncio.run(OPCUA.pause_convoyeur_coupe())
+                        print("PAUSE!!!")
+                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera)) #####concurrent.futures.ThreadPoolExecutor.submit
+                        
+                    
+
+                if kick:
+                    asyncio.run(OPCUA.appel_recyclage(0.15, 0.9))
+                    kick = False
                 cv2.rectangle(img, (460, 300), (680, 440), (0, 0, 255), 2)
                 cv_img = img
-
                 self.right_camera.frames_displayed+=1
                 self.change_pixmap_signal_wide_view.emit(cv_img)
-                self.msleep(30)
+                self.msleep(25)
         finally:
             
             self.right_camera.stop()
@@ -176,18 +184,21 @@ class VideoThread(QThread):
             self.left_camera.release_left()
             self.stopped = True
 
-    async def write_zoom_img(self, path_, img_name_, delay, csi_camera, u_b, l_b, u_b2, l_b2):
+    async def write_zoom_img(self, path_, img_name_, delay, csi_camera):
         await asyncio.sleep(delay)
+        # time.sleep(delay)
         _, img_being_written = csi_camera.read()
-        
+        img_being_written = img_being_written[200:650,:]
         hsv = cv2.cvtColor(img_being_written, cv2.COLOR_BGR2HSV)
+        u_b, l_b, u_b2, l_b2 = savon_type_zoom(self.type_savon)
         FGmask1_zoom = cv2.inRange(hsv, l_b, u_b)
         FGmask2_zoom = cv2.inRange(hsv, l_b2, u_b2)
         # FGmask_blanc = cv2.inRange(img_being_written,np.array([220,220,220]), np.array([255,255,255]))
         FGmask_zoom = cv2.add(FGmask1_zoom, FGmask2_zoom)#, FGmask_blanc)
-        FG_Obj_zoom = cv2.bitwise_and(img_being_written, img_being_written, mask=FGmask_zoom)
+        # FG_Obj_zoom = cv2.bitwise_and(img_being_written, img_being_written, mask=FGmask_zoom)
         contours, _ = cv2.findContours(FGmask_zoom, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         c = max(contours, key=cv2.contourArea)
+
         box = cv2.boxPoints(cv2.minAreaRect(c))
         x, y, w, h = cv2.boundingRect(box)
 
@@ -203,8 +214,10 @@ class VideoThread(QThread):
         roi = out[y:y+h,x:x+w]
         # self.change_pixmap_signal_zoom_view.emit(img_being_written)
         if roi.size != 0:
+            
             self.change_pixmap_signal_zoom_view.emit(roi)
             cv2.imwrite(os.path.join(path_, img_name_), out)
+            
         # return img_being_written
 
     def stop(self):
@@ -272,6 +285,7 @@ class VideoThread_Zoom(QThread):
                     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                 cv_img = img
+                cv2.rectangle(img, (460, 200), (680, 650), (0, 0, 255), 2)
                 self.change_pixmap_signal_test_zoom_view.emit(cv_img)
                 
                 self.msleep(30)

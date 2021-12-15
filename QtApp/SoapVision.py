@@ -78,7 +78,7 @@ class Arduiuno_Comm(QThread):
             time.sleep(0.01)
     
     def stop(self):
-        """Sets run flag to False and waits for thread to finish"""
+        """Sets run flag to False and waits for thread to  finish"""
         self._run_flag = False
 
 class MyWindow(QMainWindow):
@@ -108,13 +108,19 @@ class MyWindow(QMainWindow):
         self.palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
         self.font = QtGui.QFont("Arial", 16, QtGui.QFont.Bold)
 
+        self.checkbox_serial = QCheckBox(self)
+        self.checkbox_serial.move(1435, 175)
+        self.checkbox_serial.resize(400, 35)
+        self.checkbox_serial.setText("Communication avec Arduino")
+        self.checkbox_serial.setFont(self.font)
+        self.checkbox_serial.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
 
         # create the video capture thread
 
         self.checkbox_recyclage = QCheckBox(self)
         self.checkbox_recyclage.move(1435, 135)
         self.checkbox_recyclage.resize(400, 35)
-        self.checkbox_recyclage.setText("Activer/Désactiver recyclage auto.")
+        self.checkbox_recyclage.setText("Recyclage auto.")
         self.checkbox_recyclage.setFont(self.font)
         self.checkbox_recyclage.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
         # self.thread_test = VideoThread_Zoom()
