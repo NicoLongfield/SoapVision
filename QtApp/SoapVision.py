@@ -46,6 +46,28 @@ class TimeAxisItem(pg.AxisItem):
         return [int2dt(value).strftime("%H:%M:%S.%f") for value in values]
 
 
+class Slider(QSlider):
+    def __init__(self, min_, max_, action):
+        super().__init__(Qt.Horizontal)
+        self.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
+        self.resize(400, 25)
+        self.setMinimum(min_)
+        self.setMaximum(max_)
+        self.valueChanged.connect(action)
+
+
+class Label_Slider(QLabel):
+    def __init__(self, text, font):#, x, y):
+        super().__init__()
+        self.setText(text)
+        self.resize(400,25)
+        self.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
+        self.setFont(font)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # self.move(x, y)
+  
+
+
 class Arduiuno_Comm(QThread):
     change_json_serial_comm = pyqtSignal(dict)
 
@@ -108,6 +130,85 @@ class MyWindow(QMainWindow):
         self.palette = QtGui.QPalette()
         self.palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
         self.font = QtGui.QFont("Arial", 16, QtGui.QFont.Bold)
+        self.font2 = QtGui.QFont("Arial", 18, QtGui.QFont.Bold)
+
+
+
+        self.label_resultat = QLabel(self)
+
+        self.label_resultat.setStyleSheet("background-color: rgba(35,35,45,20); border: white; color: white;")
+        self.label_resultat.setFont(self.font2)
+        self.label_resultat.setText('Analyse IA :')
+        self.label_resultat.move(825, 470)
+        self.label_resultat.resize(600, 35)
+        self.label_resultat.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+
+
+        self.combo_hsv = QComboBox(self)
+        self.combo_hsv.setFont(self.font)
+        self.combo_hsv.setStyleSheet("color: white;")
+        self.combo_hsv.addItem("Auto")
+        self.combo_hsv.addItem("Manuel-Camera Grand Angle")
+        self.combo_hsv.addItem("Manuel-Camera Zoom")
+        self.combo_hsv.resize(400, 35)
+        self.combo_hsv.move(1435,450)
+        self.combo_hsv.activated[str].connect(hsv_change)
+
+        
+        self.hue_up = 0
+        self.hue_low = 0 
+        self.hue_up2 = 0
+        self.hue_low2 = 0 
+        self.sat_up = 0
+        self.sat_low = 0 
+        self.val_up = 0
+        self.val_low = 0 
+
+        self.slider_hue_up = Slider(0, 179, self.hsv_change)
+        self.slider_hue_low = Slider(0, 179, self.hsv_change)
+        self.slider_hue_up2 = Slider(0, 179, self.hsv_change)
+        self.slider_hue_low2 = Slider(0, 179, self.hsv_change)
+        self.slider_sat_up = Slider(0, 255, self.hsv_change)
+        self.slider_sat_low = Slider(0, 255, self.hsv_change)
+        self.slider_val_up = Slider(0, 255, self.hsv_change)
+        self.slider_val_low = Slider(0, 255, self.hsv_change)
+
+        self.label_hue_up = Label_Slider('Hue up', self.font)
+        self.label_hue_low = Label_Slider('Hue low', self.font)
+        self.label_hue_up2 = Label_Slider('Hue up2', self.font)
+        self.label_hue_low2 = Label_Slider('Hue low2', self.font)
+        self.label_sat_up = Label_Slider('Sat. up', self.font)
+        self.label_sat_low = Label_Slider('Sat. low', self.font)
+        self.label_val_up = Label_Slider('Val. up', self.font)
+        self.label_val_low = Label_Slider('Val. low', self.font)
+
+        self.layout_slider = QVBoxLayout(self)
+        self.widget_layout = QFrame(self)
+        self.widget_layout.move(1445, 460)
+        self.widget_layout.resize(420, 550)
+        self.widget_layout.setStyleSheet("background-color: black")
+        self.widget_layout.setLayout(self.layout_slider)
+        self.layout_slider.setGeometry(QtCore.QRect(1435, 460, 400, 550))
+        self.layout_slider.addWidget(self.combo_hsv)
+        self.layout_slider.addWidget(self.label_hue_up)
+        self.layout_slider.addWidget(self.slider_hue_up)
+        self.layout_slider.addWidget(self.label_hue_low)
+        self.layout_slider.addWidget(self.slider_hue_low)
+        self.layout_slider.addWidget(self.label_hue_up2)
+        self.layout_slider.addWidget(self.slider_hue_up2)
+        self.layout_slider.addWidget(self.label_hue_low2)
+        self.layout_slider.addWidget(self.slider_hue_low2)
+        self.layout_slider.addWidget(self.label_sat_up)
+        self.layout_slider.addWidget(self.slider_sat_up)
+        self.layout_slider.addWidget(self.label_sat_low)
+        self.layout_slider.addWidget(self.slider_sat_low)
+        self.layout_slider.addWidget(self.label_val_up)
+        self.layout_slider.addWidget(self.slider_val_up)
+        self.layout_slider.addWidget(self.label_val_low)
+        self.layout_slider.addWidget(self.slider_val_low)
+        
+        # self.widget_layout.show()
 
         self.checkbox_serial = QCheckBox(self)
         self.checkbox_serial.move(1435, 135)
@@ -119,6 +220,7 @@ class MyWindow(QMainWindow):
         self.checkbox_serial.toggled.connect(self.CheckboxArduinoComm)
         
         # create the video capture thread
+        
 
         self.checkbox_recyclage = QCheckBox(self)
         self.checkbox_recyclage.move(1435, 175)
@@ -218,7 +320,7 @@ class MyWindow(QMainWindow):
         self.plt = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()})
         self.plt.showGrid(x=True, y=True)
         self.plt.addLegend()
-        self.plt.setLabel('left', 'Temp/Hum', units='y')
+        self.plt.setLabel('left', 'Temp/Hum', units='deg C/ %')
         self.plt.setLabel('bottom', 'Temps', units='s')
         # self.plt.setXRange(0, len(x))
 		# self.plt.setYRange(0, max(y))
@@ -241,6 +343,13 @@ class MyWindow(QMainWindow):
         self.image_label_zoom.resize(self.disply_width_zoom, self.display_height_zoom)
         self.image_label_zoom.setStyleSheet("background : black;")
         self.image_label_zoom.move(825, 10)
+
+        self.image_label_ia = QLabel(self)
+        self.disply_width_ia = 600
+        self.display_height_ia = 450
+        self.image_label_ia.resize(self.disply_width_zoom, self.display_height_zoom)
+        self.image_label_ia.setStyleSheet("background : black;")
+        self.image_label_ia.move(825, 530)
 
 ########################################################################################################################
 #                                                   Buttons                                                            #
@@ -271,6 +380,14 @@ class MyWindow(QMainWindow):
         else:
             self.thread.toggle_ignore_recycle(False)
             self.checkbox_recyclage.setEnabled(True)
+
+    def hsv_change(self, slider):
+        
+
+    
+    def hsv_change_state(self, state):
+        self.state_hsv = state
+        #self.thread.state = text
 
     # Activates when Start/Stop video button is clicked to Start (ss_video
     def ClickStartVideo(self):

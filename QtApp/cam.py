@@ -168,7 +168,7 @@ class VideoThread(QThread):
                         if self.OPCUA:
                             asyncio.run(OPCUA.pause_convoyeur_coupe())
                         print("PAUSE!!!")
-                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera)) #####concurrent.futures.ThreadPoolExecutor.submit
+                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
                         
                     if not self.ignore_recycle:
                         if (id == self.target_to_recycle or self.autorecycle) and 600 <= x and x+w <= 750:
