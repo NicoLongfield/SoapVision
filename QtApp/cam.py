@@ -70,8 +70,9 @@ class VideoThread(QThread):
         self._run_flag = False
         self.stopped = True
         self.type_savon = 'Orange'
-        self.u_b, self.l_b, = self.savon_type_wide()
-        self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = self.savon_type_zoom()
+        self.reset_savon_type()
+        # self.savon_type_wide() #self.u_b, self.l_b = 
+        # self.savon_type_zoom() #self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = 
     def run(self):
         self._run_flag = True
         self.stopped = False
@@ -126,7 +127,7 @@ class VideoThread(QThread):
                 for cnt in contours:
                     area = cv2.contourArea(cnt)
                     if area > 5000:
-                        cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
+                        cv2.drawContours(img, [cnt], -1, (0, 0, 255), 2)
                         x, y, w, h = cv2.boundingRect(cnt)
                         detections.append([x, y, w, h])
 
@@ -198,7 +199,7 @@ class VideoThread(QThread):
         if roi.size != 0:
             self.target_to_recycle = last
             self.change_pixmap_signal_zoom_view.emit(roi)
-            cv2.imwrite(os.path.join(path_, img_name_), out)
+            cv2.imwrite(os.path.join(path_, img_name_), roi)
             
         # return img_being_written
     def toggle_autorecycle(self, state):
@@ -207,58 +208,62 @@ class VideoThread(QThread):
     def toggle_ignore_recycle(self, state):
         self.ignore_recycle = state
 
-    def savon_type_wide(self):
+    def savon_type_wide(self, reset):
 
-        lower_bound = np.array([0, 50, 126])
-        upper_bound = np.array([30, 255, 255])
         if self.type_savon == 'Orange':
             lower_bound = np.array([0, 50, 126])
             upper_bound = np.array([30, 255, 255])
 
-        if self.type_savon == 'Bleu':
+        elif self.type_savon == 'Bleu':
             lower_bound = np.array([93, 88, 134])
             upper_bound = np.array([103, 255, 255])
 
-        if self.type_savon == 'Vert':
+        elif self.type_savon == 'Vert':
             lower_bound = np.array([46, 38, 160])
             upper_bound = np.array([70, 255, 255])
 
-        else:
-            lower_bound = np.array([0, 50, 126])
-            upper_bound = np.array([30, 255, 255])
+        elif self.type_savon == 'Autre':
+            lower_bound = np.array([0, 0, 0])
+            upper_bound = np.array([0, 0, 0])
 
+        if reset:
+            self.u_b, self.l_b = upper_bound, lower_bound
+        
         return upper_bound, lower_bound
 
-    def savon_type_zoom(self):
-        lower_bound = np.array([0, 15, 65])
-        upper_bound = np.array([45, 255, 220])
-        lower_bound2 = np.array([140, 13, 65])
-        upper_bound2 = np.array([179, 255, 220])
+    def savon_type_zoom(self, reset):
         if self.type_savon == 'Orange':
             lower_bound = np.array([0, 15, 65])
             upper_bound = np.array([45, 255, 220])
             lower_bound2 = np.array([140, 13, 65])
             upper_bound2 = np.array([179, 255, 220])
 
-        if self.type_savon == 'Vert':
+        elif self.type_savon == 'Vert':
             lower_bound = np.array([0, 0, 125])
             upper_bound = np.array([63, 84, 255])
             lower_bound2 = np.array([157, 0, 125])
             upper_bound2 = np.array([179, 84, 255])
         
-        if self.type_savon == 'Bleu':
+        elif self.type_savon == 'Bleu':
             lower_bound = np.array([80, 10, 120])
             upper_bound = np.array([122, 179, 175])        
             lower_bound2 = np.array([179, 10, 120])
             upper_bound2 = np.array([179, 179, 175])
-        else:
-            lower_bound = np.array([0, 15, 65])
-            upper_bound = np.array([45, 255, 220])
-            lower_bound2 = np.array([140, 13, 65])
-            upper_bound2 = np.array([179, 255, 220])
+
+        elif self.type_savon == 'Autre':
+            lower_bound = np.array([0, 0, 0])
+            upper_bound = np.array([0, 0, 0])        
+            lower_bound2 = np.array([0, 0, 0])
+            upper_bound2 = np.array([0, 0, 0])
+        
+        if reset:
+            self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = upper_bound, lower_bound, upper_bound2, lower_bound2
+
         return upper_bound, lower_bound, upper_bound2, lower_bound2
 
-        
+    def reset_savon_type(self):
+        self.savon_type_wide(True)
+        self.savon_type_zoom(True)  
     # def getSlider_val(self, ub, lb):
     #     self.up_bound, self.low_bound = ub, lb
 
@@ -280,9 +285,8 @@ class VideoThread_Zoom(QThread):
         self._run_flag = False
         self.stopped = True
         self.type_savon = 'Orange'
-        self.u_b, self.l_b, = self.savon_type_wide()
-        # self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = self.savon_type_zoom()
-        self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = self.savon_type_zoom()
+        self.u_b, self.l_b, = self.savon_type_wide(False)
+        self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = self.savon_type_zoom(False)
 
     def run(self):
         self._run_flag = True
@@ -335,7 +339,7 @@ class VideoThread_Zoom(QThread):
                     # Calculate area and remove small elements
                     area = cv2.contourArea(cnt)
                     if area > 5000:
-                        cv2.drawContours(img, [cnt], -1, (0, 0, 255), 1)
+                        cv2.drawContours(img, [cnt], -1, (255, 0, 0), 3)
                         x, y, w, h = cv2.boundingRect(cnt)
                         if y >= 100 and y + h <= 600:
                             cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -377,57 +381,63 @@ class VideoThread_Zoom(QThread):
         self._run_flag = False
         # self.join()
     
-    def savon_type_wide(self):
+    def savon_type_wide(self, reset):
 
-        lower_bound = np.array([0, 50, 126])
-        upper_bound = np.array([30, 255, 255])
         if self.type_savon == 'Orange':
             lower_bound = np.array([0, 50, 126])
             upper_bound = np.array([30, 255, 255])
 
-        if self.type_savon == 'Bleu':
+        elif self.type_savon == 'Bleu':
             lower_bound = np.array([93, 88, 134])
             upper_bound = np.array([103, 255, 255])
 
-        if self.type_savon == 'Vert':
+        elif self.type_savon == 'Vert':
             lower_bound = np.array([46, 38, 160])
             upper_bound = np.array([70, 255, 255])
 
-        else:
-            lower_bound = np.array([0, 50, 126])
-            upper_bound = np.array([30, 255, 255])
-
+        elif self.type_savon == 'Autre':
+            lower_bound = np.array([0, 0, 0])
+            upper_bound = np.array([0, 0, 0])
+        
+        if reset:
+            self.u_b, self.l_b, = upper_bound, lower_bound
         return upper_bound, lower_bound
 
-    def savon_type_zoom(self):
-        lower_bound = np.array([0, 15, 65])
-        upper_bound = np.array([45, 255, 220])
-        lower_bound2 = np.array([140, 13, 65])
-        upper_bound2 = np.array([179, 255, 220])
+    def savon_type_zoom(self, reset):
+        
         if self.type_savon == 'Orange':
             lower_bound = np.array([0, 15, 65])
             upper_bound = np.array([45, 255, 220])
             lower_bound2 = np.array([140, 13, 65])
             upper_bound2 = np.array([179, 255, 220])
 
-        if self.type_savon == 'Vert':
+        elif self.type_savon == 'Vert':
             lower_bound = np.array([0, 0, 125])
             upper_bound = np.array([63, 84, 255])
             lower_bound2 = np.array([157, 0, 125])
             upper_bound2 = np.array([179, 84, 255])
         
-        if self.type_savon == 'Bleu':
+        elif self.type_savon == 'Bleu':
             lower_bound = np.array([80, 10, 120])
             upper_bound = np.array([122, 179, 175])        
             lower_bound2 = np.array([179, 10, 120])
             upper_bound2 = np.array([179, 179, 175])
 
-        else:
-            lower_bound = np.array([0, 15, 65])
-            upper_bound = np.array([45, 255, 220])
-            lower_bound2 = np.array([140, 13, 65])
-            upper_bound2 = np.array([179, 255, 220])
+        elif self.type_savon == 'Autre':
+            lower_bound = np.array([0, 0, 0])
+            upper_bound = np.array([0, 0, 0])        
+            lower_bound2 = np.array([0, 0, 0])
+            upper_bound2 = np.array([0, 0, 0])
+
+        if reset:
+            self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = upper_bound, lower_bound, upper_bound2, lower_bound2
+
         return upper_bound, lower_bound, upper_bound2, lower_bound2
+
+    def reset_savon_type(self):
+        self.savon_type_zoom(True)
+        self.savon_type_wide(True)
+        
 
     def setSlider_val(self, up1, low1, up2,low2):
         return up1, low1, up2,low2

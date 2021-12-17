@@ -112,7 +112,9 @@ class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
         # self.available_cameras = QCameraInfo.availableCameras()  # Getting available cameras
-        
+        self.state_hsv = "Auto"
+        self.type_savon = "Orange"
+
        
 
         cent = QDesktopWidget().availableGeometry().center()  # Finds the center of the screen
@@ -153,10 +155,11 @@ class MyWindow(QMainWindow):
         self.combo_hsv.addItem("Auto")
         self.combo_hsv.addItem("Manuel-Camera Grand Angle")
         self.combo_hsv.addItem("Manuel-Camera Zoom")
+        self.combo_hsv.addItem("Manuel-Camera Zoom")
         self.combo_hsv.resize(450,35)
         self.combo_hsv.move(1390,490)
+        self.combo_hsv.setCurrentText(self.state_hsv)
         self.combo_hsv.activated[str].connect(self.hsv_change_state)
-
         
         self.hue_up = 0
         self.hue_low = 0 
@@ -225,7 +228,7 @@ class MyWindow(QMainWindow):
         self.checkbox_ = QCheckBox(self)
         self.checkbox_.move(1390, 255)
         self.checkbox_.resize(450, 35)
-        self.checkbox_.setText("Controle")
+        self.checkbox_.setText("CSV")
         self.checkbox_.setFont(self.font)
         self.checkbox_.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
         self.checkbox_.setChecked(False)
@@ -298,19 +301,19 @@ class MyWindow(QMainWindow):
         self.ss_video.clicked.connect(self.ClickStartVideo)
         
         #ComboBox to select soap type
-        self.combo = QComboBox(self)
-        self.combo.setFont(self.font)
-        self.combo.setStyleSheet("border: 2px solid #5c5c5c; color: white; background-color: rgba(35,35,45,255);")
-        self.combo.addItem("Orange")
-        self.combo.addItem("Bleu")
-        self.combo.addItem("Vert")
-        self.combo.addItem("Autre")
+        self.combo_type_savon = QComboBox(self)
+        self.combo_type_savon.setFont(self.font)
+        self.combo_type_savon.setStyleSheet("border: 2px solid #5c5c5c; color: white; background-color: rgba(35,35,45,255);")
+        self.combo_type_savon.addItem('Orange')
+        self.combo_type_savon.addItem('Bleu')
+        self.combo_type_savon.addItem('Vert')
+        self.combo_type_savon.addItem('Autre')
         # self.combo.addItem("Manual - Wide")
-        self.combo.move(1390, 95)
-        self.combo.resize(450, 35)
+        self.combo_type_savon.move(1390, 95)
+        self.combo_type_savon.resize(450, 35)
         # self.qlabel = QLabel(self)
         # self.qlabel.move(1500, 61)
-        self.combo.activated[str].connect(self.onChanged)
+        self.combo_type_savon.activated[str].connect(self.onChanged)
 
         self.btn_test_zoom = QPushButton(self)
         self.btn_test_zoom.setText('Test Cam Zoom')
@@ -373,8 +376,9 @@ class MyWindow(QMainWindow):
 ########################################################################################################################
 
     def wait_for_hsv(self, t, wide):
-        t = threading.Timer(1, self.get_first_hsv_val, args=[t, wide])
-        t.start()
+        if self.state_hsv == "Auto":
+            t = threading.Timer(1, self.get_first_hsv_val, args=[t, wide])
+            t.start()
         # while(self.timer_hsv.isActive()):
         #     if self.timer_hsv.remainingTime() < 300:
         #         self.get_first_hsv_val(t, wide)
@@ -382,8 +386,16 @@ class MyWindow(QMainWindow):
         #         timer.sleep(0.1)
 
     def onChanged(self, text):
-        self.thread.type_savon = text
-        self.thread_test.type_savon = text
+        self.combo_hsv.setCurrentText("Auto")
+        self.type_savon = text
+        if self.thread.isRunning():
+            self.thread.type_savon = text
+            self.thread.reset_savon_type()
+            self.wait_for_hsv(self.thread, True)
+        if self.thread_test.isRunning():
+            self.thread_test.type_savon = text
+            self.thread_test.reset_savon_type()
+            self.wait_for_hsv(self.thread_test, False)
         # if self.thread.isRunning():
         #     self.wait_for_hsv()
         # self.qlabel.adjustSize()
@@ -428,73 +440,73 @@ class MyWindow(QMainWindow):
         self.slider_sat_up.setValue(self.sat_up)
         self.slider_sat_low.setValue(self.sat_low)
         self.slider_val_up.setValue(self.val_up)
-        self.slider_val_low.value(self.val_low) 
+        self.slider_val_low.setValue(self.val_low) 
 
     def hsv_change(self, slider):
-        self.hue_up = self.slider_hue_up.value()
-        self.hue_low = self.slider_hue_low.value()
-        self.hue_up2 = self.slider_hue_up2.value()
-        self.hue_low2 = self.slider_hue_low2.value()
-        self.sat_up = self.slider_sat_up.value()
-        self.sat_low = self.slider_sat_low.value()
-        self.val_up = self.slider_val_up.value()
-        self.val_low = self.slider_val_low.value()
-    
+        if self.state_hsv != 'Auto':
+            self.hue_up = self.slider_hue_up.value()
+            self.hue_low = self.slider_hue_low.value()
+            self.hue_up2 = self.slider_hue_up2.value()
+            self.hue_low2 = self.slider_hue_low2.value()
+            self.sat_up = self.slider_sat_up.value()
+            self.sat_low = self.slider_sat_low.value()
+            self.val_up = self.slider_val_up.value()
+            self.val_low = self.slider_val_low.value()
+            if self.thread.isRunning():
+                self.push_hsv_val(self.thread, self.state_hsv)
+            if self.thread_test.isRunning():
+                self.push_hsv_val(self.thread_test, self.state_hsv)
+            self.hsv_change_text()
    
 
-
     def get_first_hsv_val(self, t, wide):
-        if wide:
-            self.hue_up = t.u_b[0]
-            self.hue_low = t.l_b[0]
-            self.sat_up = t.u_b[1]
-            self.sat_low = t.l_b[1]
-            self.val_up = t.u_b[2]
-            self.val_low = t.l_b[2]
-            self.hue_up2 = 0
-            self.hue_low2 = 0
-            
-        else:
-            self.hue_up2 = t.u_b2_z[0]
-            self.hue_low2 = t.l_b2_z[0]
-            
-            self.hue_up = t.u_b_z[0]
-            self.hue_low = t.l_b_z[0]
-            self.sat_up = t.u_b_z[1]
-            self.sat_low = t.l_b_z[1]
-            self.val_up = t.u_b_z[2]
-            self.val_low = t.l_b_z[2]
-        
-        self.hsv_change_text()
-        self.hsv_change_value()
+        if self.state_hsv == 'Auto':
+            if wide:
+                self.hue_up = t.u_b[0]
+                self.hue_low = t.l_b[0]
+                self.sat_up = t.u_b[1]
+                self.sat_low = t.l_b[1]
+                self.val_up = t.u_b[2]
+                self.val_low = t.l_b[2]
+                self.hue_up2 = 0
+                self.hue_low2 = 0
+                
+            else:
+                self.hue_up2 = t.u_b2_z[0]
+                self.hue_low2 = t.l_b2_z[0]
+                
+                self.hue_up = t.u_b_z[0]
+                self.hue_low = t.l_b_z[0]
+                self.sat_up = t.u_b_z[1]
+                self.sat_low = t.l_b_z[1]
+                self.val_up = t.u_b_z[2]
+                self.val_low = t.l_b_z[2]
+
+            self.hsv_change_text()
+            self.hsv_change_value()
     
+            
+       
     def hsv_change_state(self, state): # State pour modifier le HSV
         self.state_hsv = state
-        
-        #self.thread.state = text
+            
 
-    def push_hsv_val(self, t, wide):
-        if thread_test.isRunning():
-            self.hue_up = t.u_b[0]
-            self.hue_low = t.l_b[0]
-            self.sat_up = t.u_b[1]
-            self.sat_low = t.l_b[1]
-            self.val_up = t.u_b[2]
-            self.val_low = t.l_b[2]
-            self.hue_up2 = 0
-            self.hue_low2 = 0
-            
-        else:
-            self.hue_up2 = t.u_b2_z[0]
-            self.hue_low2 = t.l_b2_z[0]
-            
-            self.hue_up = t.u_b_z[0]
-            self.hue_low = t.l_b_z[0]
-            self.sat_up = t.u_b_z[1]
-            self.sat_low = t.l_b_z[1]
-            self.val_up = t.u_b_z[2]
-            self.val_low = t.l_b_z[2]
+# "Manuel-Camera Grand Angle"
+# "Manuel-Camera Zoom"
         
+#self.thread.state = text
+
+    def push_hsv_val(self, thread_, state):
+        if state == "Manuel-Camera Grand Angle":
+            thread_.l_b = np.array([self.hue_low, self.sat_low , self.val_low])
+            thread_.u_b = np.array([self.hue_up,  self.sat_up, self.val_up])
+        
+        if state == "Manuel-Camera Zoom":
+            thread_.l_b_z = np.array([self.hue_low, self.sat_low, self.val_low])
+            thread_.u_b_z = np.array([self.hue_up, self.sat_up, self.val_up])
+            thread_.l_b2_z = np.array([self.hue_low2, self.sat_low, self.val_low])
+            thread_.u_b2_z = np.array([self.hue_up2, self.sat_up, self.val_up])
+
 
     # Activates when Start/Stop video button is clicked to Start (ss_video
     def ClickStartVideo(self):
@@ -518,6 +530,7 @@ class MyWindow(QMainWindow):
         self.thread.start()
         self.ss_video.clicked.connect(self.thread.stop)  # Stop the video if button clicked
         self.ss_video.clicked.connect(self.ClickStopVideo)
+        self.combo_hsv.setEnabled(True)
         self.wait_for_hsv(self.thread, True)
         
         # self.timer_hsv.timeout.connect(self.wait_for_hsv())
@@ -525,6 +538,7 @@ class MyWindow(QMainWindow):
 
     # Activates when Start/Stop video button is clicked to Stop (ss_video)
     def ClickStopVideo(self):
+        self.combo_hsv.setEnabled(False)
         self.btn_test_zoom.setEnabled(True)
         self.thread.change_pixmap_signal_wide_view.disconnect()
         self.ss_video.setText('Start video')
@@ -555,10 +569,12 @@ class MyWindow(QMainWindow):
         self.btn_test_zoom.clicked.connect(self.ClickStopTestZoom)
         # self.timer_hsv.timeout.connect(self.wait_for_hsv(self.thread_test, False))
         # self.timer_hsv.start(5500)
+        self.combo_hsv.setEnabled(True)
         self.wait_for_hsv(self.thread_test, False)
 
     # Activates when Start/Stop video button is clicked to Stop (ss_video)
     def ClickStopTestZoom(self):
+        self.combo_hsv.setEnabled(False)
         if self.ss_video.isEnabled() == False:
             self.ss_video.setEnabled(True)
         self.thread_test.change_pixmap_signal_test_zoom_view.disconnect()
