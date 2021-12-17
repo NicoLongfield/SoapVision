@@ -1,7 +1,7 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread, QTimer
 
 import sys
 from pathlib import Path
@@ -49,18 +49,19 @@ class TimeAxisItem(pg.AxisItem):
 class Slider(QSlider):
     def __init__(self, min_, max_, action):
         super().__init__(Qt.Horizontal)
-        self.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
-        self.resize(400, 25)
+        self.resize(400, 15)
         self.setMinimum(min_)
         self.setMaximum(max_)
-        self.valueChanged.connect(action)
+        # self.setInvertedAppearance(True)
+        self.setStyleSheet("QSlider::add-page:horizontal{background-color:white;} QSlider::sub-page:horizontal{background-color: white;}")
+        self.valueChanged.connect(action)#self))
 
 
 class Label_Slider(QLabel):
     def __init__(self, text, font):#, x, y):
         super().__init__()
         self.setText(text)
-        self.resize(400,25)
+        self.resize(400,15)
         self.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
         self.setFont(font)
         self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -129,6 +130,7 @@ class MyWindow(QMainWindow):
     def initWindow(self):
         self.palette = QtGui.QPalette()
         self.palette.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+        self.font3 = QtGui.QFont("Arial", 14, QtGui.QFont.Bold)
         self.font = QtGui.QFont("Arial", 16, QtGui.QFont.Bold)
         self.font2 = QtGui.QFont("Arial", 18, QtGui.QFont.Bold)
 
@@ -139,7 +141,7 @@ class MyWindow(QMainWindow):
         self.label_resultat.setStyleSheet("background-color: rgba(35,35,45,20); border: white; color: white;")
         self.label_resultat.setFont(self.font2)
         self.label_resultat.setText('Analyse IA :')
-        self.label_resultat.move(825, 470)
+        self.label_resultat.move(780, 470)
         self.label_resultat.resize(600, 35)
         self.label_resultat.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
@@ -147,13 +149,13 @@ class MyWindow(QMainWindow):
 
         self.combo_hsv = QComboBox(self)
         self.combo_hsv.setFont(self.font)
-        self.combo_hsv.setStyleSheet("color: white;")
+        self.combo_hsv.setStyleSheet("border: 2px solid #5c5c5c; color: white; background-color: rgba(35,35,45,255);")
         self.combo_hsv.addItem("Auto")
         self.combo_hsv.addItem("Manuel-Camera Grand Angle")
         self.combo_hsv.addItem("Manuel-Camera Zoom")
-        self.combo_hsv.resize(400, 35)
-        self.combo_hsv.move(1435,450)
-        self.combo_hsv.activated[str].connect(hsv_change)
+        self.combo_hsv.resize(450,35)
+        self.combo_hsv.move(1390,490)
+        self.combo_hsv.activated[str].connect(self.hsv_change_state)
 
         
         self.hue_up = 0
@@ -174,23 +176,23 @@ class MyWindow(QMainWindow):
         self.slider_val_up = Slider(0, 255, self.hsv_change)
         self.slider_val_low = Slider(0, 255, self.hsv_change)
 
-        self.label_hue_up = Label_Slider('Hue up', self.font)
-        self.label_hue_low = Label_Slider('Hue low', self.font)
-        self.label_hue_up2 = Label_Slider('Hue up2', self.font)
-        self.label_hue_low2 = Label_Slider('Hue low2', self.font)
-        self.label_sat_up = Label_Slider('Sat. up', self.font)
-        self.label_sat_low = Label_Slider('Sat. low', self.font)
-        self.label_val_up = Label_Slider('Val. up', self.font)
-        self.label_val_low = Label_Slider('Val. low', self.font)
+        self.label_hue_up = Label_Slider('Hue up', self.font3)
+        self.label_hue_low = Label_Slider('Hue low', self.font3)
+        self.label_hue_up2 = Label_Slider('Hue up2', self.font3)
+        self.label_hue_low2 = Label_Slider('Hue low2', self.font3)
+        self.label_sat_up = Label_Slider('Sat. up', self.font3)
+        self.label_sat_low = Label_Slider('Sat. low', self.font3)
+        self.label_val_up = Label_Slider('Val. up', self.font3)
+        self.label_val_low = Label_Slider('Val. low', self.font3)
 
         self.layout_slider = QVBoxLayout(self)
         self.widget_layout = QFrame(self)
-        self.widget_layout.move(1445, 460)
-        self.widget_layout.resize(420, 550)
-        self.widget_layout.setStyleSheet("background-color: black")
+        self.widget_layout.move(1390, 550)
+        self.widget_layout.resize(450, 400)
+        self.widget_layout.setStyleSheet("background-color: rgba(255, 255, 255, 0)")
         self.widget_layout.setLayout(self.layout_slider)
-        self.layout_slider.setGeometry(QtCore.QRect(1435, 460, 400, 550))
-        self.layout_slider.addWidget(self.combo_hsv)
+        # self.layout_slider.setGeometry(QtCore.QRect(1435, 460, 400, 550))
+        #self.layout_slider.addWidget(self.combo_hsv, 3)
         self.layout_slider.addWidget(self.label_hue_up)
         self.layout_slider.addWidget(self.slider_hue_up)
         self.layout_slider.addWidget(self.label_hue_low)
@@ -211,8 +213,8 @@ class MyWindow(QMainWindow):
         # self.widget_layout.show()
 
         self.checkbox_serial = QCheckBox(self)
-        self.checkbox_serial.move(1435, 135)
-        self.checkbox_serial.resize(400, 35)
+        self.checkbox_serial.move(1390, 135)
+        self.checkbox_serial.resize(450, 35)
         self.checkbox_serial.setText("Communication avec Arduino")
         self.checkbox_serial.setFont(self.font)
         self.checkbox_serial.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
@@ -220,11 +222,20 @@ class MyWindow(QMainWindow):
         self.checkbox_serial.toggled.connect(self.CheckboxArduinoComm)
         
         # create the video capture thread
+        self.checkbox_ = QCheckBox(self)
+        self.checkbox_.move(1390, 255)
+        self.checkbox_.resize(450, 35)
+        self.checkbox_.setText("Controle")
+        self.checkbox_.setFont(self.font)
+        self.checkbox_.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
+        self.checkbox_.setChecked(False)
+        # self.checkbox_.toggled.connect(self.CheckboxArduinoComm)
         
 
+
         self.checkbox_recyclage = QCheckBox(self)
-        self.checkbox_recyclage.move(1435, 175)
-        self.checkbox_recyclage.resize(400, 35)
+        self.checkbox_recyclage.move(1390, 175)
+        self.checkbox_recyclage.resize(450, 35)
         self.checkbox_recyclage.setText("Recyclage auto.")
         self.checkbox_recyclage.setFont(self.font)
         self.checkbox_recyclage.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
@@ -232,8 +243,8 @@ class MyWindow(QMainWindow):
         self.checkbox_recyclage.toggled.connect(self.CheckboxAutoRecycle)
 
         self.checkbox_ignore_recyclage = QCheckBox(self)
-        self.checkbox_ignore_recyclage.move(1435, 215)
-        self.checkbox_ignore_recyclage.resize(400, 35)
+        self.checkbox_ignore_recyclage.move(1390, 215)
+        self.checkbox_ignore_recyclage.resize(450, 35)
         self.checkbox_ignore_recyclage.setText("Ignorer le recyclage")
         self.checkbox_ignore_recyclage.setFont(self.font)
         self.checkbox_ignore_recyclage.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
@@ -242,8 +253,8 @@ class MyWindow(QMainWindow):
         # self.thread_test = VideoThread_Zoom()
 
         self.label_color = QLabel(self)
-        self.label_color.move(1685, 320)
-        self.label_color.resize(120,120)
+        self.label_color.move(1650, 315)
+        self.label_color.resize(175,120)
         # self.label_color.setAutoFillBackground(True)
         self.color_r = 0
         self.color_g = 0
@@ -254,14 +265,14 @@ class MyWindow(QMainWindow):
         self.data_temp = deque(maxlen=40)
         self.data_hum = deque(maxlen=40)
         self.data_time = deque(maxlen=40)
-        self.label_color.setStyleSheet("border: 3px black; border-radius: 50px; background-color: rgb({}, {}, {});".format(self.color_r, self.color_g, self.color_b))
+        self.label_color.setStyleSheet("border: 3px black; border-radius: 15px; background-color: rgb({}, {}, {});".format(self.color_r, self.color_g, self.color_b))
 
         self.label_data = QLabel(self)
 
         self.label_data.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
         self.label_data.setFont(self.font)
         self.label_data.setText('Données des capteurs : \n R = {} \n G = {} \n B = {} \n Lux = {} \n Temp Celsius = {} \n Hum = {} \n'.format(self.color_r, self.color_g, self.color_b, self.color_lux, self.temp, self.hum))
-        self.label_data.move(1435, 300)
+        self.label_data.move(1390, 300)
         self.label_data.adjustSize()
         self.label_data.setAlignment(Qt.AlignLeft)
 
@@ -273,7 +284,7 @@ class MyWindow(QMainWindow):
         self.label.setText('SoapVision : Application de vision numérique pour la mini-usine')  # Add text to label
         self.label.setFont(self.font)
         self.label.setStyleSheet("background-color: rgba(255,255,255,0); color: white;")
-        self.label.move(15, 980)  
+        self.label.move(10, 980)  
         self.label.resize(850, 40)  
         self.label.setAlignment(Qt.AlignLeft) 
 
@@ -282,19 +293,21 @@ class MyWindow(QMainWindow):
         self.ss_video.setText('Start video')
         self.ss_video.setStyleSheet("background-color: rgb(102, 255, 153);")
         self.ss_video.setFont(self.font)
-        self.ss_video.move(1435, 10)
-        self.ss_video.resize(200, 75)
+        self.ss_video.move(1390, 10)
+        self.ss_video.resize(220, 75)
         self.ss_video.clicked.connect(self.ClickStartVideo)
         
         #ComboBox to select soap type
         self.combo = QComboBox(self)
         self.combo.setFont(self.font)
-        self.combo.setStyleSheet("color: white;")
+        self.combo.setStyleSheet("border: 2px solid #5c5c5c; color: white; background-color: rgba(35,35,45,255);")
         self.combo.addItem("Orange")
         self.combo.addItem("Bleu")
         self.combo.addItem("Vert")
-        self.combo.move(1435, 95)
-        self.combo.resize(400, 35)
+        self.combo.addItem("Autre")
+        # self.combo.addItem("Manual - Wide")
+        self.combo.move(1390, 95)
+        self.combo.resize(450, 35)
         # self.qlabel = QLabel(self)
         # self.qlabel.move(1500, 61)
         self.combo.activated[str].connect(self.onChanged)
@@ -303,8 +316,8 @@ class MyWindow(QMainWindow):
         self.btn_test_zoom.setText('Test Cam Zoom')
         self.btn_test_zoom.setStyleSheet("background-color: rgb(102, 255, 153);")
         self.btn_test_zoom.setFont(self.font)
-        self.btn_test_zoom.move(1645, 10)
-        self.btn_test_zoom.resize(200, 75)
+        self.btn_test_zoom.move(1620, 10)
+        self.btn_test_zoom.resize(220, 75)
         self.btn_test_zoom.clicked.connect(self.ClickStartTestZoom)
 
         # Status bar
@@ -314,7 +327,7 @@ class MyWindow(QMainWindow):
         self.status.showMessage('Ready to start')
 
         self.graph_widget = QFrame(self)
-        self.graph_widget.move(55, 590)
+        self.graph_widget.move(10, 590)
         self.graph_widget.resize(760, 385)
         self.graph_widget.setStyleSheet("background-color: black")
         self.plt = pg.PlotWidget(axisItems={'bottom': pg.DateAxisItem()})
@@ -335,29 +348,44 @@ class MyWindow(QMainWindow):
         self.display_height = 570
         self.image_label.resize(self.disply_width, self.display_height)
         self.image_label.setStyleSheet("background : black;")
-        self.image_label.move(55, 10)
+        self.image_label.move(10, 10)
 
         self.image_label_zoom = QLabel(self)
         self.disply_width_zoom = 600
         self.display_height_zoom = 450
         self.image_label_zoom.resize(self.disply_width_zoom, self.display_height_zoom)
         self.image_label_zoom.setStyleSheet("background : black;")
-        self.image_label_zoom.move(825, 10)
+        self.image_label_zoom.move(780, 10)
 
         self.image_label_ia = QLabel(self)
         self.disply_width_ia = 600
         self.display_height_ia = 450
         self.image_label_ia.resize(self.disply_width_zoom, self.display_height_zoom)
         self.image_label_ia.setStyleSheet("background : black;")
-        self.image_label_ia.move(825, 530)
+        self.image_label_ia.move(780, 530)
 
+        self.timer_hsv = QTimer()
+        # self.timer_hsv.setSingleShot(True)
+        # self.timer_hsv.timeout.connect(self.wait_for_hsv(self.thread_test, False))
+        # self.timer_hsv.start(5500)
 ########################################################################################################################
 #                                                   Buttons                                                            #
 ########################################################################################################################
+
+    def wait_for_hsv(self, t, wide):
+        t = threading.Timer(1, self.get_first_hsv_val, args=[t, wide])
+        t.start()
+        # while(self.timer_hsv.isActive()):
+        #     if self.timer_hsv.remainingTime() < 300:
+        #         self.get_first_hsv_val(t, wide)
+        #     else:
+        #         timer.sleep(0.1)
+
     def onChanged(self, text):
         self.thread.type_savon = text
         self.thread_test.type_savon = text
-        
+        # if self.thread.isRunning():
+        #     self.wait_for_hsv()
         # self.qlabel.adjustSize()
     
     def CheckboxArduinoComm(self):
@@ -381,13 +409,92 @@ class MyWindow(QMainWindow):
             self.thread.toggle_ignore_recycle(False)
             self.checkbox_recyclage.setEnabled(True)
 
-    def hsv_change(self, slider):
-        
+    def hsv_change_text(self):
+        self.label_hue_up.setText('Hue up: {}'.format(self.hue_up))
+        self.label_hue_low.setText('Hue low: {}'.format(self.hue_low))
+        self.label_hue_low.setText('Hue low: {}'.format(self.hue_low))
+        self.label_hue_up2.setText('Hue up2: {}'.format(self.hue_up2))
+        self.label_hue_low2.setText('Hue low2: {}'.format(self.hue_low2))
+        self.label_sat_up.setText('Sat. up: {}'.format(self.sat_up))
+        self.label_sat_low.setText('Sat. low: {}'.format(self.sat_low))
+        self.label_val_up.setText('Val. up: {}'.format(self.val_up))
+        self.label_val_low.setText('Val. low: {}'.format(self.val_low))
 
+    def hsv_change_value(self):
+        self.slider_hue_up.setValue(self.hue_up)
+        self.slider_hue_low.setValue(self.hue_low)
+        self.slider_hue_up2.setValue(self.hue_up2)
+        self.slider_hue_low2.setValue(self.hue_low2)
+        self.slider_sat_up.setValue(self.sat_up)
+        self.slider_sat_low.setValue(self.sat_low)
+        self.slider_val_up.setValue(self.val_up)
+        self.slider_val_low.value(self.val_low) 
+
+    def hsv_change(self, slider):
+        self.hue_up = self.slider_hue_up.value()
+        self.hue_low = self.slider_hue_low.value()
+        self.hue_up2 = self.slider_hue_up2.value()
+        self.hue_low2 = self.slider_hue_low2.value()
+        self.sat_up = self.slider_sat_up.value()
+        self.sat_low = self.slider_sat_low.value()
+        self.val_up = self.slider_val_up.value()
+        self.val_low = self.slider_val_low.value()
     
-    def hsv_change_state(self, state):
+   
+
+
+    def get_first_hsv_val(self, t, wide):
+        if wide:
+            self.hue_up = t.u_b[0]
+            self.hue_low = t.l_b[0]
+            self.sat_up = t.u_b[1]
+            self.sat_low = t.l_b[1]
+            self.val_up = t.u_b[2]
+            self.val_low = t.l_b[2]
+            self.hue_up2 = 0
+            self.hue_low2 = 0
+            
+        else:
+            self.hue_up2 = t.u_b2_z[0]
+            self.hue_low2 = t.l_b2_z[0]
+            
+            self.hue_up = t.u_b_z[0]
+            self.hue_low = t.l_b_z[0]
+            self.sat_up = t.u_b_z[1]
+            self.sat_low = t.l_b_z[1]
+            self.val_up = t.u_b_z[2]
+            self.val_low = t.l_b_z[2]
+        
+        self.hsv_change_text()
+        self.hsv_change_value()
+    
+    def hsv_change_state(self, state): # State pour modifier le HSV
         self.state_hsv = state
+        
         #self.thread.state = text
+
+    def push_hsv_val(self, t, wide):
+        if thread_test.isRunning():
+            self.hue_up = t.u_b[0]
+            self.hue_low = t.l_b[0]
+            self.sat_up = t.u_b[1]
+            self.sat_low = t.l_b[1]
+            self.val_up = t.u_b[2]
+            self.val_low = t.l_b[2]
+            self.hue_up2 = 0
+            self.hue_low2 = 0
+            
+        else:
+            self.hue_up2 = t.u_b2_z[0]
+            self.hue_low2 = t.l_b2_z[0]
+            
+            self.hue_up = t.u_b_z[0]
+            self.hue_low = t.l_b_z[0]
+            self.sat_up = t.u_b_z[1]
+            self.sat_low = t.l_b_z[1]
+            self.val_up = t.u_b_z[2]
+            self.val_low = t.l_b_z[2]
+        
 
     # Activates when Start/Stop video button is clicked to Start (ss_video
     def ClickStartVideo(self):
@@ -406,11 +513,15 @@ class MyWindow(QMainWindow):
         # self.thread = VideoThread()
         self.thread.change_pixmap_signal_wide_view.connect(self.update_image)
         self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
+        self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
         # start the thread
         self.thread.start()
         self.ss_video.clicked.connect(self.thread.stop)  # Stop the video if button clicked
         self.ss_video.clicked.connect(self.ClickStopVideo)
-
+        self.wait_for_hsv(self.thread, True)
+        
+        # self.timer_hsv.timeout.connect(self.wait_for_hsv())
+        # self.timer_hsv.start(5500)
 
     # Activates when Start/Stop video button is clicked to Stop (ss_video)
     def ClickStopVideo(self):
@@ -422,6 +533,8 @@ class MyWindow(QMainWindow):
         self.ss_video.clicked.disconnect(self.ClickStopVideo)
         self.ss_video.clicked.disconnect(self.thread.stop)
         self.ss_video.clicked.connect(self.ClickStartVideo)
+        # self.timer_hsv.timeout.disconnect(self.wait_for_hsv(self.thread, True))
+        
         
     def ClickStartTestZoom(self):
         # Change label color to light blue
@@ -435,23 +548,28 @@ class MyWindow(QMainWindow):
         self.btn_test_zoom.setStyleSheet("background-color: rgb(255, 80, 80);")
         
         self.thread_test.change_pixmap_signal_test_zoom_view.connect(self.update_image)
-      
+        self.thread_test.change_pixmap_signal_test_wide_view.connect(self.update_image_zoom, Qt.QueuedConnection)
         # start the thread
         self.thread_test.start()
         self.btn_test_zoom.clicked.connect(self.thread_test.stop)  # Stop the video if button clicked
         self.btn_test_zoom.clicked.connect(self.ClickStopTestZoom)
-
+        # self.timer_hsv.timeout.connect(self.wait_for_hsv(self.thread_test, False))
+        # self.timer_hsv.start(5500)
+        self.wait_for_hsv(self.thread_test, False)
 
     # Activates when Start/Stop video button is clicked to Stop (ss_video)
     def ClickStopTestZoom(self):
         if self.ss_video.isEnabled() == False:
             self.ss_video.setEnabled(True)
         self.thread_test.change_pixmap_signal_test_zoom_view.disconnect()
+        self.thread_test.change_pixmap_signal_test_wide_view.disconnect()
         self.btn_test_zoom.setText('Start Test Zoom')
         self.btn_test_zoom.setStyleSheet("background-color: rgb(102, 255, 153);")
         self.btn_test_zoom.clicked.disconnect(self.ClickStopTestZoom)
         self.btn_test_zoom.clicked.disconnect(self.thread_test.stop)
         self.btn_test_zoom.clicked.connect(self.ClickStartTestZoom)
+        # self.timer_hsv.timeout.disconnect(self.wait_for_hsv(self.thread_test, True))
+        
 
 ########################################################################################################################
 #                                                   Actions                                                            #
@@ -496,7 +614,7 @@ class MyWindow(QMainWindow):
             self.color_lux = str_json["lux"]
             self.temp = str_json["dht_temp"]
             self.hum = str_json["dht_hum"]
-        self.label_color.setStyleSheet("border: 5px black; border-radius: 60px; background-color: rgb({}, {}, {});".format(self.color_r, self.color_g, self.color_b))
+        self.label_color.setStyleSheet("border: 5px black; border-radius: 15px; background-color: rgb({}, {}, {});".format(self.color_r, self.color_g, self.color_b))
         self.label_data.setText('Donnees des capteurs : \n R = {} \n G = {} \n B = {} \n Lux = {} \n Temp Celsius = {} \n Hum = {} \n'.format(self.color_r, self.color_g, self.color_b, self.color_lux, self.temp, self.hum))
         self.label_data.adjustSize()
         self.data_temp.append(self.temp)
