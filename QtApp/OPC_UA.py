@@ -36,7 +36,7 @@ class OPCUACommunication():
         async with Client(url=self.url_OPCUA_boudineuse) as client:
             dv_true = ua.DataValue(ua.Variant(True, ua.VariantType.Boolean))
             node_conservation = await client.nodes.root.get_child(["0:Objects", "4:NX1021020_Boudineuse","3:GlobalVars","4:entree_OPCUA_conservation_bondon"]) #,"4:GlobalVars","4:OPCUA_entree_pause_convoyeur_presse"]
-            await asyncio.sleep(0.18)
+            await asyncio.sleep(0.10)
             await node_conservation.set_value(dv_true)
             
             

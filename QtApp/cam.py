@@ -16,16 +16,6 @@ time_init()
 path = '/home/jetson_user/Projet/Images/' + time.strftime('%d_%b_%Y')
 Path(path).mkdir(parents=True, exist_ok=True)
 
-
-
-    
-
-
-    # return upper_bound, lower_bound
-
-
-
-
 # Simple draw label on an image; in our case, the video frame
 def draw_label(cv_image, label_text, label_position):
     font_face = cv2.FONT_HERSHEY_SIMPLEX
@@ -146,6 +136,9 @@ class VideoThread(QThread):
                         print("PAUSE!!!")
                         asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
                         
+                        # t = threading.Timer(1, self.write_zoom_img, args=[path, img_name, delayv, self.left_camera, last])
+                        # t.start()#asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
+                        
                     if not self.ignore_recycle:
                         if (id == self.target_to_recycle or self.autorecycle) and 685 <= x and x+w <= 850:
                             asyncio.run(OPCUA.appel_recyclage(0.15, 0.9))
@@ -194,7 +187,7 @@ class VideoThread(QThread):
         cv2.drawContours(mask, [c], 0, (255,255,255), -1)
         cv2.drawContours(mask, [c], 0, (255,255,255), 3)
         out = cv2.bitwise_and(img_being_written, img_being_written, mask=mask)
-        roi = out[y:y+h,x:x+w]
+        roi = cv2.cvtColor(out[y:y+h,x:x+w], cv2.COLOR_BGR2RGB)
         # self.change_pixmap_signal_zoom_view.emit(img_being_written)
         if roi.size != 0:
             self.target_to_recycle = last
@@ -278,6 +271,8 @@ class VideoThread_Zoom(QThread):
     change_pixmap_signal_test_wide_view = pyqtSignal(np.ndarray)
     left_camera = CSI_Camera()
     right_camera = CSI_Camera()
+
+    opcua_pause_convoyeur = pyqtSignal()
     
     
     def __init__(self):
@@ -362,7 +357,7 @@ class VideoThread_Zoom(QThread):
                     cv2.putText(img_right, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                     cv2.rectangle(img_right, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-                cv_img = img
+                cv_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 cv_img2 = img_right
                 cv2.rectangle(img, (460, 200), (680, 650), (0, 0, 255), 2)
                 self.change_pixmap_signal_test_zoom_view.emit(cv_img)

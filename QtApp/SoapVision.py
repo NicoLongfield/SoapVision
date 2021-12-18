@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QThread, QTimer
 
+from PIL.ImageQt import ImageQt
+
 import sys
 from pathlib import Path
 import time
@@ -10,11 +12,13 @@ import os
 import json
 
 import asyncio
+import asyncua
 import concurrent.futures
 import threading
 import multiprocessing
 import math
 import serial
+
 
 from collections import deque
 import pyqtgraph as pg
@@ -27,8 +31,9 @@ from OPC_UA import *
 from Time_func import *
 from csi_camera import CSI_Camera
 from cam import *
+from SegCNN import *
 
-
+import logging
 
 # SAVON = sys.argv[2]
 
@@ -109,12 +114,13 @@ class MyWindow(QMainWindow):
     thread = VideoThread()
     thread2 = Arduiuno_Comm()
     thread_test = VideoThread_Zoom()
+    thread_ai = SegNet()
+    
     def __init__(self):
         super(MyWindow, self).__init__()
         # self.available_cameras = QCameraInfo.availableCameras()  # Getting available cameras
         self.state_hsv = "Auto"
         self.type_savon = "Orange"
-
        
 
         cent = QDesktopWidget().availableGeometry().center()  # Finds the center of the screen
@@ -125,6 +131,9 @@ class MyWindow(QMainWindow):
         self.initWindow()
         self.ClickStartTestZoom()
         self.ss_video.setEnabled(False)
+        #self.thread_ai.set()
+        
+        self.thread_ai.start(priority=5)
         
 ########################################################################################################################
 #                                                   Windows                                                            #
@@ -524,14 +533,17 @@ class MyWindow(QMainWindow):
         self.ss_video.setStyleSheet("background-color: rgb(255, 80, 80);")
         # self.thread = VideoThread()
         self.thread.change_pixmap_signal_wide_view.connect(self.update_image)
+        self.thread.change_pixmap_signal_zoom_view.connect(self.thread_ai.get_image)
         self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
-        self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
+        self.thread_ai.change_pixmap_signal_ai.connect(self.update_image_ai)
+        # self.thread.change_pixmap_signal_ai.connect(self.update_image_zoom, Qt.QueuedConnection)
         # start the thread
         self.thread.start()
         self.ss_video.clicked.connect(self.thread.stop)  # Stop the video if button clicked
         self.ss_video.clicked.connect(self.ClickStopVideo)
         self.combo_hsv.setEnabled(True)
         self.wait_for_hsv(self.thread, True)
+        # self.thread_ai.set
         
         # self.timer_hsv.timeout.connect(self.wait_for_hsv())
         # self.timer_hsv.start(5500)
@@ -541,6 +553,8 @@ class MyWindow(QMainWindow):
         self.combo_hsv.setEnabled(False)
         self.btn_test_zoom.setEnabled(True)
         self.thread.change_pixmap_signal_wide_view.disconnect()
+        self.thread.change_pixmap_signal_zoom_view.disconnect()
+        self.thread_ai.change_pixmap_signal_ai.disconnect()
         self.ss_video.setText('Start video')
         self.ss_video.setStyleSheet("background-color: rgb(102, 255, 153);")
         self.status.showMessage('Ready to start')
@@ -596,10 +610,19 @@ class MyWindow(QMainWindow):
         qt_img = self.convert_cv_qt(cv_img)
         self.image_label.setPixmap(qt_img)
 
+
     def update_image_zoom(self, cv_img2):
         """Updates the image_label with a new opencv image"""
         qt_img = self.convert_cv_qt_zoom(cv_img2)
         self.image_label_zoom.setPixmap(qt_img)
+
+    
+    def update_image_ai(self, result):
+        """Updates the image_label with a new opencv image"""
+        qt_img_temp = ImageQt(Image.fromarray((np.argmax(result, axis=0) * 255 / result.shape[0]).astype(np.uint8)))
+        qt_img = QtGui.QPixmap.fromImage(qt_img_temp)
+        self.image_label_ia.setPixmap(qt_img)
+    
 
     def convert_cv_qt(self, cv_img):
         """Convert from an opencv image to QPixmap"""
@@ -613,13 +636,15 @@ class MyWindow(QMainWindow):
 
     def convert_cv_qt_zoom(self, cv_img):
         """Convert from an opencv image to QPixmap"""
-        rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        rgb_image = cv_img
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
         convert_to_Qt_format = QtGui.QImage(rgb_image.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
         p = convert_to_Qt_format.scaled(self.disply_width_zoom, self.display_height_zoom, Qt.KeepAspectRatio)
         #p = convert_to_Qt_format.scaled(801, 801, Qt.KeepAspectRatio)
         return QPixmap.fromImage(p)
+
+    
 
     def update_text(self, str_json):
     # self.label.setText(json.dumps(str_json))
@@ -651,6 +676,7 @@ class MyWindow(QMainWindow):
         else:
             event.accept()
 
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
