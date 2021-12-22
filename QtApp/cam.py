@@ -44,7 +44,7 @@ DISPLAY_HEIGHT = 720
 
 class VideoThread(QThread):
     # change_pixmap_signal = pyqtSignal(np.ndarray)
-    
+    change_pixmap_signal_ai = pyqtSignal(np.ndarray)
     change_pixmap_signal_wide_view = pyqtSignal(np.ndarray)
     change_pixmap_signal_zoom_view = pyqtSignal(np.ndarray)
     left_camera = CSI_Camera()
@@ -61,6 +61,8 @@ class VideoThread(QThread):
         self.stopped = True
         self.type_savon = 'Orange'
         self.reset_savon_type()
+        self.img_name = ""
+        self.mask_name = ""
         # self.savon_type_wide() #self.u_b, self.l_b = 
         # self.savon_type_zoom() #self.u_b_z, self.l_b_z, self.u_b2_z, self.l_b2_z = 
     def run(self):
@@ -130,11 +132,12 @@ class VideoThread(QThread):
                     if 440 <= x and x + w <= 680 and id != last:
                         # self.u_b, self.l_b, self.u_b2, self.l_b2 = savon_type_zoom(self.type_savon)
                         last = id
-                        img_name = 'Ocean_' + str(id) + '_' + str(time_string()) + '.jpg'  #####
+                        self.img_name = str(self.type_savon) +"_"+ str(id) + '_' + str(time_string()) + '.jpg'  #####
+                        self.mask_name = str(self.type_savon) +"_"+ str(id) + '_' + str(time_string()) +'_label'+ '.jpg'
                         if self.OPCUA:
                             asyncio.run(OPCUA.pause_convoyeur_coupe())
                         print("PAUSE!!!")
-                        asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
+                        asyncio.run(self.write_zoom_img(path, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
                         
                         # t = threading.Timer(1, self.write_zoom_img, args=[path, img_name, delayv, self.left_camera, last])
                         # t.start()#asyncio.run(self.write_zoom_img(path, img_name, delayv, self.left_camera, last)) #####concurrent.futures.ThreadPoolExecutor.submit
@@ -159,7 +162,7 @@ class VideoThread(QThread):
 
 
 
-    async def write_zoom_img(self, path_, img_name_, delay, csi_camera, last):
+    async def write_zoom_img(self, path_, delay, csi_camera, last):
         await asyncio.sleep(delay)
         l_b, u_b, l_b2, u_b2 = self.l_b_z, self.u_b_z, self.l_b2_z, self.u_b2_z
         # time.sleep(delay)
@@ -187,13 +190,44 @@ class VideoThread(QThread):
         cv2.drawContours(mask, [c], 0, (255,255,255), -1)
         cv2.drawContours(mask, [c], 0, (255,255,255), 3)
         out = cv2.bitwise_and(img_being_written, img_being_written, mask=mask)
-        roi = cv2.cvtColor(out[y:y+h,x:x+w], cv2.COLOR_BGR2RGB)
+        roi = out[y:y+h,x:x+w]
         # self.change_pixmap_signal_zoom_view.emit(img_being_written)
         if roi.size != 0:
-            self.target_to_recycle = last
+            # self.target_to_recycle = last
             self.change_pixmap_signal_zoom_view.emit(roi)
-            cv2.imwrite(os.path.join(path_, img_name_), roi)
-            
+            self.algo_detection_defauts(roi, last, path_, mask_name)
+            cv2.imwrite(os.path.join(path_, self.img_name), roi)
+    
+    def algo_detection_defauts(self, img, last, path_, mask_name):
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, outer_cotour = cv2.threshold(gray_img, 20, 255, cv2.THRESH_BINARY)
+        mask = np.zeros((gray_img.shape[0], gray_img.shape[1]))
+        resultat_mask = np.zeros((gray_img.shape[0], gray_img.shape[1]))
+        contours, _ = cv2.findContours(outer_cotour, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        c = max(contours, key=cv2.contourArea)
+        cv2.drawContours(mask, [c], -1, (255), -1)
+        gray_img = cv2.normalize(gray_img, gray_img, 0, 255, cv2.NORM_MINMAX, mask=np.uint8(mask))
+        resultat = cv2.adaptivveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 5)
+        cv2.drawContours(resultat, [c], -1, (0), 11)
+        resultat = cv2.medianBlur(resultat, ksize=3)
+        resultat = cv2.GaussianBlur(resultat, (9,9), sigmaX=0, sigmaY=0)
+        resultat = cv2.medianBlur(resultat, ksize=3)
+        resultat = cv2.GaussianBlur(resultat, (11,11), sigmaX=0, sigmaY=0)
+        _, resultat = cv2.threshold(resultat, 35, 255, cv2.THRESH_BINARY)
+        resultat = cv2.GaussianBlur(resultat, (11,11), sigmaX=0, sigmaY=0)
+        _, fc = cv2.threshold(resultat, 75, 255, cv2.THRESH_BINARY)
+        if len(cv2.findNonZero(fc))>10000:
+            self.target_to_recycle = last
+        contours, _ = cv2.findContours(fc, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for cnt in contours:
+            if cv2.contourArea(cnt)>500:
+                x,y,w,h = cv2.boundingRect(cnt)
+                cv2.rectangle(img, (x,y), (x+w,y+h), (0,0,200))
+                cv2.drawContours(resultat_mask, [cnt], -1, (255,255,255), -1)
+                cv2.drawContours(resultat_mask, [cnt], -1, (255,255,255), 4)
+        self.change_pixmap_signal_ai.emit(img)
+        cv2.imwrite(os.path.join(path_, self.mask_name), resultat_mask)
+
         # return img_being_written
     def toggle_autorecycle(self, state):
         self.autorecycle = state

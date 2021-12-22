@@ -26,12 +26,13 @@ import pyqtgraph as pg
 import cv2
 import numpy as np
 
+from csv_ import *
 from tracker import *
 from OPC_UA import *
 from Time_func import *
 from csi_camera import CSI_Camera
 from cam import *
-from SegCNN import *
+# from SegCNN import *
 
 import logging
 
@@ -114,14 +115,17 @@ class MyWindow(QMainWindow):
     thread = VideoThread()
     thread2 = Arduiuno_Comm()
     thread_test = VideoThread_Zoom()
-    thread_ai = SegNet()
+    CSV = csv_data_export() #headers = ['Time', 'Image', 'Mask', 'Valid', 'Temp', 'Hum', 'Lux', 'R', 'G', 'B']
+    # thread_ai = SegNet()
     
     def __init__(self):
         super(MyWindow, self).__init__()
         # self.available_cameras = QCameraInfo.availableCameras()  # Getting available cameras
         self.state_hsv = "Auto"
         self.type_savon = "Orange"
-       
+        self.image_name = ""
+        self.mask_name = ""
+        self.csv_enabled = True
 
         cent = QDesktopWidget().availableGeometry().center()  # Finds the center of the screen
         self.setStyleSheet("background-color: qlineargradient(x1:0 y1:0, x2:1 y2:1, stop:0 rgb(35, 35, 45), stop:1  rgb(3, 3, 25));")
@@ -133,7 +137,7 @@ class MyWindow(QMainWindow):
         self.ss_video.setEnabled(False)
         #self.thread_ai.set()
         
-        self.thread_ai.start(priority=5)
+        # self.thread_ai.start(priority=5)
         
 ########################################################################################################################
 #                                                   Windows                                                            #
@@ -163,7 +167,6 @@ class MyWindow(QMainWindow):
         self.combo_hsv.setStyleSheet("border: 2px solid #5c5c5c; color: white; background-color: rgba(35,35,45,255);")
         self.combo_hsv.addItem("Auto")
         self.combo_hsv.addItem("Manuel-Camera Grand Angle")
-        self.combo_hsv.addItem("Manuel-Camera Zoom")
         self.combo_hsv.addItem("Manuel-Camera Zoom")
         self.combo_hsv.resize(450,35)
         self.combo_hsv.move(1390,490)
@@ -240,8 +243,8 @@ class MyWindow(QMainWindow):
         self.checkbox_.setText("CSV")
         self.checkbox_.setFont(self.font)
         self.checkbox_.setStyleSheet("QCheckBox::indicator{width: 30px; height: 30px; color: white;}QCheckBox{color: white; background-color: rgba(35,35,45,255);}")
-        self.checkbox_.setChecked(False)
-        # self.checkbox_.toggled.connect(self.CheckboxArduinoComm)
+        self.checkbox_.setChecked(True)
+        self.checkbox_.toggled.connect(self.CheckboxCSV)
         
 
 
@@ -414,7 +417,19 @@ class MyWindow(QMainWindow):
             self.thread2.start()
         else:
             self.thread2.stop()
+            self.color_r = 0
+            self.color_g = 0
+            self.color_b = 0
+            self.color_lux = 0
+            self.temp = 0
+            self.hum = 0
     
+    def CheckboxCSV(self):
+        if self.checkbox_.isChecked() == True:
+            self.csv_enabled = True
+        else:
+            self.csv_enabled = False
+
     def CheckboxAutoRecycle(self):
         if self.checkbox_recyclage.isChecked() == True:
             self.thread.toggle_autorecycle(True)
@@ -533,9 +548,10 @@ class MyWindow(QMainWindow):
         self.ss_video.setStyleSheet("background-color: rgb(255, 80, 80);")
         # self.thread = VideoThread()
         self.thread.change_pixmap_signal_wide_view.connect(self.update_image)
-        self.thread.change_pixmap_signal_zoom_view.connect(self.thread_ai.get_image)
+        # self.thread.change_pixmap_signal_zoom_view.connect(self.thread_ai.get_image)
         self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
-        self.thread_ai.change_pixmap_signal_ai.connect(self.update_image_ai)
+        self.thread.change_pixmap_signal_ai.connect(self.update_image_ai, Qt.QueuedConnection)
+        # self.thread_ai.change_pixmap_signal_ai.connect(self.update_image_ai)
         # self.thread.change_pixmap_signal_ai.connect(self.update_image_zoom, Qt.QueuedConnection)
         # start the thread
         self.thread.start()
@@ -554,7 +570,8 @@ class MyWindow(QMainWindow):
         self.btn_test_zoom.setEnabled(True)
         self.thread.change_pixmap_signal_wide_view.disconnect()
         self.thread.change_pixmap_signal_zoom_view.disconnect()
-        self.thread_ai.change_pixmap_signal_ai.disconnect()
+        self.thread.change_pixmap_signal_ai.disconnect()
+        # self.thread_ai.change_pixmap_signal_ai.disconnect()
         self.ss_video.setText('Start video')
         self.ss_video.setStyleSheet("background-color: rgb(102, 255, 153);")
         self.status.showMessage('Ready to start')
@@ -619,9 +636,24 @@ class MyWindow(QMainWindow):
     
     def update_image_ai(self, result):
         """Updates the image_label with a new opencv image"""
-        qt_img_temp = ImageQt(Image.fromarray((np.argmax(result, axis=0) * 255 / result.shape[0]).astype(np.uint8)))
-        qt_img = QtGui.QPixmap.fromImage(qt_img_temp)
+        # qt_img_temp = ImageQt(Image.fromarray((np.argmax(result, axis=0) * 255 / result.shape[0]).astype(np.uint8)))
+        # qt_img = QtGui.QPixmap.fromImage(qt_img_temp)
+        qt_img = self.convert_cv_qt_zoom(cv_img2)
         self.image_label_ia.setPixmap(qt_img)
+        self.image_name = self.thread.img_name
+        self.mask_name = self.thread.mask_name
+        if self.csv_enabled:    
+            data_to_append = []
+            data_to_append.append(str(time_string()))
+            data_to_append.append(self.image_name)
+            data_to_append.append(self.mask_name)
+            data_to_append.append(self.temp)
+            data_to_append.append(self.hum)
+            data_to_append.append(self.color_lux)
+            data_to_append.append(self.color_r)
+            data_to_append.append(self.color_g)
+            data_to_append.append(self.color_b)
+            self.CSV._append_to_csv(data_to_append)
     
 
     def convert_cv_qt(self, cv_img):
@@ -636,7 +668,8 @@ class MyWindow(QMainWindow):
 
     def convert_cv_qt_zoom(self, cv_img):
         """Convert from an opencv image to QPixmap"""
-        rgb_image = cv_img
+        rgb_image = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+        # rgb_image = cv_img
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
         convert_to_Qt_format = QtGui.QImage(rgb_image.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
@@ -666,6 +699,7 @@ class MyWindow(QMainWindow):
     def update_graph(self):
         self.line1.setData(x=list(self.data_time), y=list(self.data_hum))#, pen='g', symbol='x',symbolPen='g', symbolBrush=0.2, name='Hum')
         self.line2.setData(x=list(self.data_time), y=list(self.data_temp))#, pen='b', symbol='o',symbolPen='b', symbolBrush=0.2, name='Temp')
+
 
 
     def closeEvent(self, event):
