@@ -10,10 +10,21 @@ from tracker import *
 from OPC_UA import *
 from Time_func import *
 from pathlib import Path
+from collections import deque
+
 time_init()
 
 
-path = '/home/jetson_user/Projet/Images/' + time.strftime('%d_%b_%Y')
+SENSIBILITE_DETECTION_DEFAUTS = 650 #Aire en pixels d'un defaut critique
+DEFAUT_RATIO_DEFAUT = 0.3
+DEFAUT_AUCUN = 0
+DEFAUT_INTERIEUR = 1
+DEFAUT_CONTOUR = 2
+DEFAUT_COUTEAU = 3
+
+
+
+path = '/home/jetson_user/Pictures/' + time.strftime('%d_%b_%Y')
 Path(path).mkdir(parents=True, exist_ok=True)
 
 # Simple draw label on an image; in our case, the video frame
@@ -36,7 +47,7 @@ show_fps = True
 
 tracker = EuclideanDistTracker()
 OPCUA = OPCUACommunication()
-OPCUA_Pause = sys.argv[1]
+OPCUA_Pause = True
 
 SENSOR_MODE_720 = 3
 DISPLAY_WIDTH = 960
@@ -47,6 +58,7 @@ class VideoThread(QThread):
     change_pixmap_signal_ai = pyqtSignal(np.ndarray)
     change_pixmap_signal_wide_view = pyqtSignal(np.ndarray)
     change_pixmap_signal_zoom_view = pyqtSignal(np.ndarray)
+    append_buffer_type_defaut_signal = pyqtSignal(int)
     left_camera = CSI_Camera()
     right_camera = CSI_Camera()
     def __init__(self):
@@ -97,7 +109,6 @@ class VideoThread(QThread):
         delayv = 0.5
         last = -1
         new = False
-        target_to_recycle = -1
         try:
             
             #self.left_camera.start_counting_fps()
@@ -179,10 +190,10 @@ class VideoThread(QThread):
         c = max(contours, key=cv2.contourArea)
 
         box = cv2.boxPoints(cv2.minAreaRect(c))
-        x, y, w, h = cv2.boundingRect(box)
+        x_savon_, y_savon_, w_savon_, h_savon_ = cv2.boundingRect(box)
 
-        x = np.int32((x+math.floor(w/2))-175)
-        y = np.int32((y+math.floor(h/2))-150)
+        x = np.int32((x_savon_+math.floor(w_savon_/2))-175)
+        y = np.int32((y_savon_+math.floor(h_savon_/2))-150)
         w = np.int32(350)
         h = np.int32(300)
         
@@ -195,19 +206,20 @@ class VideoThread(QThread):
         if roi.size != 0:
             # self.target_to_recycle = last
             self.change_pixmap_signal_zoom_view.emit(roi)
-            self.algo_detection_defauts(roi, last, path_, mask_name)
+            self.algo_detection_defauts(roi, last, path_, self.mask_name, x_savon_, y_savon_, w_savon_, h_savon_)
             cv2.imwrite(os.path.join(path_, self.img_name), roi)
     
-    def algo_detection_defauts(self, img, last, path_, mask_name):
+    def algo_detection_defauts(self, img_original, last, path_, mask_name, x_savon, y_savon, w_savon, h_savon):
+        img = img_original.copy()
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, outer_cotour = cv2.threshold(gray_img, 20, 255, cv2.THRESH_BINARY)
         mask = np.zeros((gray_img.shape[0], gray_img.shape[1]))
-        resultat_mask = np.zeros((gray_img.shape[0], gray_img.shape[1]))
+        resultat_mask = np.zeros((gray_img.shape[0], gray_img.shape[1]), dtype=np.uint8)
         contours, _ = cv2.findContours(outer_cotour, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         c = max(contours, key=cv2.contourArea)
         cv2.drawContours(mask, [c], -1, (255), -1)
         gray_img = cv2.normalize(gray_img, gray_img, 0, 255, cv2.NORM_MINMAX, mask=np.uint8(mask))
-        resultat = cv2.adaptivveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 5)
+        resultat = cv2.adaptiveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 11, 4)
         cv2.drawContours(resultat, [c], -1, (0), 11)
         resultat = cv2.medianBlur(resultat, ksize=3)
         resultat = cv2.GaussianBlur(resultat, (9,9), sigmaX=0, sigmaY=0)
@@ -216,17 +228,63 @@ class VideoThread(QThread):
         _, resultat = cv2.threshold(resultat, 35, 255, cv2.THRESH_BINARY)
         resultat = cv2.GaussianBlur(resultat, (11,11), sigmaX=0, sigmaY=0)
         _, fc = cv2.threshold(resultat, 75, 255, cv2.THRESH_BINARY)
-        if len(cv2.findNonZero(fc))>10000:
+        if len(cv2.findNonZero(fc))>8000:
             self.target_to_recycle = last
+
+        gray_img = cv2.cvtColor(gray_img, cv2.COLOR_GRAY2BGR)
         contours, _ = cv2.findContours(fc, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for cnt in contours:
-            if cv2.contourArea(cnt)>500:
+            if cv2.contourArea(cnt)>400:
                 x,y,w,h = cv2.boundingRect(cnt)
-                cv2.rectangle(img, (x,y), (x+w,y+h), (0,0,200))
-                cv2.drawContours(resultat_mask, [cnt], -1, (255,255,255), -1)
-                cv2.drawContours(resultat_mask, [cnt], -1, (255,255,255), 4)
-        self.change_pixmap_signal_ai.emit(img)
+                cv2.rectangle(gray_img, (x,y), (x+w,y+h), (np.random.randint(0,255),np.random.randint(0,255),np.random.randint(0,255)), 2)
+                cv2.drawContours(resultat_mask, [cnt], -1, 255, -1)
+                cv2.drawContours(resultat_mask, [cnt], -1, 255, 4)
+                self.target_to_recycle = last
+
+            
+        
+        # _, resultat_mask = cv2.threshold(resultat_mask, 75, 255, cv2.THRESH_BINARY)
+        
+        bande_defaut = 10
+        #On prend les regions de la box du savon et on trouve le ration de defaut dans chacune des regions
+        # area_contour_defaut = len(cv2.findNonZero(fc[y_savon:y_savon+bande_defaut, x_savon:x_savon+w_savon])) +  len(cv2.findNonZero(fc[y_savon+h_savon-bande_defaut:y_savon+h_savon, x_savon:x_savon+w_savon]))
+        # print(area_contour_defaut)
+        # ratio_contour_defaut = area_contour_defaut/(2*bande_defaut*w_savon)
+        # print(ratio_contour_defaut)
+        # area_couteau_defaut = len(cv2.findNonZero(fc[y_savon:y_savon+h_savon, x_savon:x_savon+bande_defaut])) + len(cv2.findNonZero(fc[y_savon:y_savon+h_savon, x_savon+w_savon-bande_defaut:x_savon+w_savon]))
+        # print(area_couteau_defaut)
+        # ratio_couteau_defaut = area_couteau_defaut/(2*bande_defaut*h_savon)
+        # print(ratio_couteau_defaut)
+        # area_interieur_defaut = len(cv2.findNonZero(fc[y_savon+bande_defaut:y_savon+h_savon-bande_defaut, x_savon+bande_defaut:x_savon+w_savon-bande_defaut]))
+        # print(area_interieur_defaut)
+        # ratio_interieur_defaut = area_interieur_defaut/((h_savon-2*bande_defaut)*(w_savon-2*bande_defaut))
+        # print(ratio_interieur_defaut)
+
+        area_contour_defaut = np.count_nonzero(fc[y_savon:y_savon+bande_defaut, x_savon:x_savon+w_savon]) +  np.count_nonzero(fc[y_savon+h_savon-bande_defaut:y_savon+h_savon, x_savon:x_savon+w_savon])
+        print(area_contour_defaut)
+        ratio_contour_defaut = area_contour_defaut/(2*bande_defaut*w_savon)
+        print(ratio_contour_defaut)
+        area_couteau_defaut = np.count_nonzero(fc[y_savon:y_savon+h_savon, x_savon:x_savon+bande_defaut]) + np.count_nonzero(fc[y_savon:y_savon+h_savon, x_savon+w_savon-bande_defaut:x_savon+w_savon])
+        print(area_couteau_defaut)
+        ratio_couteau_defaut = area_couteau_defaut/(2*bande_defaut*h_savon)
+        print(ratio_couteau_defaut)
+        area_interieur_defaut = np.count_nonzero(fc[y_savon+bande_defaut:y_savon+h_savon-bande_defaut, x_savon+bande_defaut:x_savon+w_savon-bande_defaut])
+        print(area_interieur_defaut)
+        ratio_interieur_defaut = area_interieur_defaut/((h_savon-2*bande_defaut)*(w_savon-2*bande_defaut))
+        print(ratio_interieur_defaut)
+        if ratio_contour_defaut > DEFAUT_RATIO_DEFAUT and ratio_contour_defaut > ratio_couteau_defaut and ratio_contour_defaut > ratio_interieur_defaut:
+            type_defaut = DEFAUT_CONTOUR
+        if ratio_couteau_defaut > DEFAUT_RATIO_DEFAUT and ratio_couteau_defaut > ratio_contour_defaut and ratio_couteau_defaut > ratio_interieur_defaut:
+            type_defaut = DEFAUT_COUTEAU
+        if ratio_interieur_defaut > DEFAUT_RATIO_DEFAUT and ratio_interieur_defaut > ratio_contour_defaut and ratio_interieur_defaut > ratio_couteau_defaut:
+            type_defaut = DEFAUT_INTERIEUR
+        else:
+            type_defaut = DEFAUT_AUCUN
+        self.change_pixmap_signal_ai.emit(gray_img)
+        self.append_buffer_type_defaut_signal.emit(type_defaut)
         cv2.imwrite(os.path.join(path_, self.mask_name), resultat_mask)
+        return True
+
 
         # return img_being_written
     def toggle_autorecycle(self, state):
@@ -391,7 +449,7 @@ class VideoThread_Zoom(QThread):
                     cv2.putText(img_right, str(id), (x, y - 15), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 2)
                     cv2.rectangle(img_right, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-                cv_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                cv_img = img
                 cv_img2 = img_right
                 cv2.rectangle(img, (460, 200), (680, 650), (0, 0, 255), 2)
                 self.change_pixmap_signal_test_zoom_view.emit(cv_img)

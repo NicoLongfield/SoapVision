@@ -18,6 +18,7 @@ import threading
 import multiprocessing
 import math
 import serial
+import operator
 
 
 from collections import deque
@@ -42,7 +43,10 @@ time_init()
 print(OPCUA_Pause)
 # print(SAVON)
 
-
+DEFAUT_AUCUN = 0
+DEFAUT_INTERIEUR = 1
+DEFAUT_CONTOUR = 2
+DEFAUT_COUTEAU = 3
 
 class TimeAxisItem(pg.AxisItem):
     def __init__(self, *args, **kwargs):
@@ -126,6 +130,8 @@ class MyWindow(QMainWindow):
         self.image_name = ""
         self.mask_name = ""
         self.csv_enabled = True
+        self.buffer_type_defaut = deque(maxlen=10)
+
 
         cent = QDesktopWidget().availableGeometry().center()  # Finds the center of the screen
         self.setStyleSheet("background-color: qlineargradient(x1:0 y1:0, x2:1 y2:1, stop:0 rgb(35, 35, 45), stop:1  rgb(3, 3, 25));")
@@ -158,7 +164,7 @@ class MyWindow(QMainWindow):
         self.label_resultat.setText('Analyse IA :')
         self.label_resultat.move(780, 470)
         self.label_resultat.resize(600, 35)
-        self.label_resultat.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.label_resultat.setAlignment(Qt.AlignLeft)
 
 
 
@@ -549,8 +555,9 @@ class MyWindow(QMainWindow):
         # self.thread = VideoThread()
         self.thread.change_pixmap_signal_wide_view.connect(self.update_image)
         # self.thread.change_pixmap_signal_zoom_view.connect(self.thread_ai.get_image)
-        self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom, Qt.QueuedConnection)
-        self.thread.change_pixmap_signal_ai.connect(self.update_image_ai, Qt.QueuedConnection)
+        self.thread.change_pixmap_signal_zoom_view.connect(self.update_image_zoom)
+        self.thread.change_pixmap_signal_ai.connect(self.update_image_ai)
+        self.thread.append_buffer_type_defaut_signal.connect(self.update_ai_label, Qt.QueuedConnection)
         # self.thread_ai.change_pixmap_signal_ai.connect(self.update_image_ai)
         # self.thread.change_pixmap_signal_ai.connect(self.update_image_zoom, Qt.QueuedConnection)
         # start the thread
@@ -571,6 +578,8 @@ class MyWindow(QMainWindow):
         self.thread.change_pixmap_signal_wide_view.disconnect()
         self.thread.change_pixmap_signal_zoom_view.disconnect()
         self.thread.change_pixmap_signal_ai.disconnect()
+        self.thread.append_buffer_type_defaut_signal.disconnect()
+        
         # self.thread_ai.change_pixmap_signal_ai.disconnect()
         self.ss_video.setText('Start video')
         self.ss_video.setStyleSheet("background-color: rgb(102, 255, 153);")
@@ -638,7 +647,7 @@ class MyWindow(QMainWindow):
         """Updates the image_label with a new opencv image"""
         # qt_img_temp = ImageQt(Image.fromarray((np.argmax(result, axis=0) * 255 / result.shape[0]).astype(np.uint8)))
         # qt_img = QtGui.QPixmap.fromImage(qt_img_temp)
-        qt_img = self.convert_cv_qt_zoom(cv_img2)
+        qt_img = self.convert_cv_qt_zoom(result)
         self.image_label_ia.setPixmap(qt_img)
         self.image_name = self.thread.img_name
         self.mask_name = self.thread.mask_name
@@ -655,6 +664,22 @@ class MyWindow(QMainWindow):
             data_to_append.append(self.color_b)
             self.CSV._append_to_csv(data_to_append)
     
+    def update_ai_label(self, type_defaut):
+        banque_str_label = ['Aucun', 'Interieur', 'Contour', 'Couteau']
+        banque_commentaire = [' -- Recurrence de fleurissement/compression ', ' -- Recurrence de defaut sur le contour ', ' -- Verifiez le couteau']
+        self.buffer_type_defaut.append(type_defaut)
+        label = 'Analyse IA : Dernier: ' +  banque_str_label[type_defaut]
+        
+        nb_defaut_contour = self.buffer_type_defaut.count(DEFAUT_CONTOUR)
+        nb_defaut_couteau = self.buffer_type_defaut.count(DEFAUT_COUTEAU)
+        nb_defaut_interieur = self.buffer_type_defaut.count(DEFAUT_INTERIEUR)
+        
+        index_type_defaut_max, nb_occurence_type_defaut = max(enumerate([nb_defaut_interieur, nb_defaut_contour, nb_defaut_couteau]), key=operator.itemgetter(1))
+        
+        if nb_occurence_type_defaut >= 5:
+            label += banque_commentaire[index_type_defaut_max]
+
+        self.label_resultat.setText(label)
 
     def convert_cv_qt(self, cv_img):
         """Convert from an opencv image to QPixmap"""
@@ -710,7 +735,7 @@ class MyWindow(QMainWindow):
         else:
             event.accept()
 
-logging.basicConfig(format="%(message)s", level=logging.INFO)
+# logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
